@@ -1,0 +1,25 @@
+{
+  "env": {
+    "node": true,
+    "commonjs": true,
+    "es6": true,
+    "browser": true
+  },
+
+  "extends": "eslint:recommended",
+
+  "rules": {
+    "indent": 0,
+    "no-undef": "error",
+    "no-console": [
+      "error",
+      {
+        "allow": ["warn", "error", "info", "log"]
+      }
+    ]
+  },
+  "parserOptions": {
+    "ecmaVersion": 2018,
+    "sourceType": "module"
+  }
+}

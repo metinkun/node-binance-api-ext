@@ -1,0 +1,56 @@
+{
+  "name": "node-binance-api-ext",
+  "version": "0.3.0",
+  "description": "Extended Binance API for node",
+  "main": "src/index.js",
+  "dependencies": {
+    "async": "^3.1.0",
+    "axios": "^0.19.2",
+    "https-proxy-agent": "^3.0.1",
+    "qs": "^6.9.4",
+    "socks-proxy-agent": "^4.0.2",
+    "string-hash": "^1.1.3",
+    "url": "^0.11.0",
+    "ws": "^7.2.0"
+  },
+  "scripts": {
+    "test": "mocha",
+    "test-debug": "mocha --inspect-brk",
+    "lint": "eslint -c .eslintrc.js node-binance-api.js test.js",
+    "cover": "istanbul cover _mocha --report lcovonly",
+    "coveralls": "cat ./coverage/lcov.info | coveralls",
+    "codacy": "cat ./coverage/lcov.info | codacy-coverage -v",
+    "codecov": "codecov"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/metinkun/node-binance-api-ext.git"
+  },
+  "keywords": [
+    "binance",
+    "api",
+    "binance rate limit",
+    "binance futures api",
+    "binance api ext",
+    "binance api"
+  ],
+  "author": "Metinkun <kundakcioglum@gmail.com> (https://argatechnology.com/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/metinkun/node-binance-api-ext/issues"
+  },
+  "homepage": "https://github.com/metinkun/node-binance-api-ext#readme",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "chai-counter": "^1.0.0",
+    "codacy-coverage": "^3.4.0",
+    "codecov": "^3.6.1",
+    "coveralls": "^3.0.7",
+    "eslint": "^6.7.0",
+    "istanbul": "^0.4.5",
+    "jsdoc": "^3.6.3",
+    "mocha": "^6.2.2",
+    "mocha-lcov-reporter": "^1.3.0",
+    "nyc": "^14.1.1"
+  }
+}
