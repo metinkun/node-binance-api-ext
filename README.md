@@ -1,20 +1,36 @@
-[![Downloads](https://img.shields.io/npm/dm/node-binance-api-ext.svg?labelColor=blueviolet)](https://npm-stat.com/charts.html?package=node-binance-api-ext&from=2020-01-01&to=2021-01-01) [![GitHub last commit](https://img.shields.io/github/last-commit/metinkun/node-binance-api-ext.svg?maxAge=2400)](#) [![Latest Version](https://img.shields.io/github/release/metinkun/node-binance-api-ext.svg?style=flat-square)](https://github.com/metinkun/node-binance-api-ext/releases) <!-- [![npm downloads](https://img.shields.io/npm/dt/node-binance-api.svg?maxAge=7200)](https://www.npmjs.com/package/node-binance-api) [![Build Status](https://travis-ci.org/metinkun/node-binance-api.svg?branch=master&style=flat-square)](https://travis-ci.org/metinkun/node-binance-api) [![Coverage Status](https://coveralls.io/repos/github/metinkun/node-binance-api/badge.svg?branch=master&style=flat-square)](https://coveralls.io/github/metinkun/node-binance-api) [![CodeCov](https://codecov.io/gh/metinkun/node-binance-api/branch/master/graph/badge.svg?style=flat-square)](https://codecov.io/github/metinkun/node-binance-api/) [![Codacy Badge](https://api.codacy.com/project/badge/Coverage/996757cec66542c0a64fca2b4cf8a936)](https://www.codacy.com/app/metinkun/node-binance-api?utm_source=github.com&utm_medium=referral&utm_content=metinkun/node-binance-api&utm_campaign=Badge_Coverage) [![Codacy Grade](https://api.codacy.com/project/badge/Grade/996757cec66542c0a64fca2b4cf8a936)](https://www.codacy.com/app/metinkun/node-binance-api) -->
+[![GitHub last commit](https://img.shields.io/github/last-commit/metinkun/node-binance-api-ext.svg?maxAge=2400)](#)
+[![npm version](https://img.shields.io/npm/v/node-binance-api-ext.svg?style=flat-square)](https://www.npmjs.com/package/axios-rate-limit)
+[![npm downloads](https://img.shields.io/npm/dt/node-binance-api-ext.svg?style=flat-square)](https://www.npmjs.com/package/axios-rate-limit)
+
+[![Buy me a coffee][buymeacoffee-shield]][buymeacoffee]
 
 [![NPM](https://nodei.co/npm/node-binance-api-ext.png?compact=true)](https://npmjs.org/package/node-binance-api-ext)
 
 # Node Binance API Ext
 
-This project is designed to help you make your own projects that interact with the [Binance API](https://github.com/binance-exchange/binance-official-api-docs). You can stream candlestick chart data, market depth, or use other advanced features such as setting stop losses and iceberg orders. This project seeks to have complete API coverage including WebSockets. With full documented functions and intellisense support , it is easy to use
+This project is designed to help you make your own projects that interact with the [Binance API](https://github.com/binance-exchange/binance-official-api-docs). You can stream candlestick chart data, market depth, or use other advanced features such as setting stop losses and iceberg orders. This project seeks to have complete API coverage including WebSockets.
+
+With full documented functions and intellisense support , it is easy to use
 
 --FEATURES
-*All functions has extended documentation
-*All functions has callback and promise support
-*All possible parameters and enums are in intellisense
-*All functions has temporary apikey-secretkey support
+
+\*All functions has extended documentation
+
+\*All functions has callback and promise support
+
+\*All possible parameters and enums are in intellisense
+
+\*All functions has temporary apikey-secretkey support
+
 \*Futures stoplimit and stopmarket functions added
 
 --TODO
+
 \*Weigth rate controlling and rate limit support
+
+\*Automatic syncronize timestamp if server throws timestamp error
+
+---
 
 <b><p align="center">
 <a href="#binance-futures-api" style="color:#f9c513">Futures API</a> &amp;
@@ -37,7 +53,7 @@ This project is designed to help you make your own projects that interact with t
 #### Getting started
 
 ```javascript
-const Binance = require('node-binance-api');
+const Binance = require('node-binance-api-ext');
 const binance = new Binance().options({
   APIKEY: '<key>',
   APISECRET: '<secret>',
@@ -2194,19 +2210,19 @@ You can enable verbose mode to help with debugging WebSocket streams:
 binance.setOption('verbose', true);
 ```
 
-> ### For support go to [Telegram](https://t.me/binance_api_english)
+> ### For support go to [Telegram](https://t.me/binance_api_ext)
 
 ## Contribution
 
 - Give us a star :star:
-- Fork and Clone! Awesome
 - Select existing [issues](https://github.com/metinkun/node-binance-api-ext/issues) or create a [new issue](https://github.com/metinkun/node-binance-api-ext/issues/new) and give us a PR with your bugfix or improvement after. We love it ❤️
 
-**_Special thanks to our most frequent or significant contributors:_** bmino, dmzoneill, dmitriz, keith1024
+## A bit of advertising :-)
 
-**_Thank you to all contributors:_** joelrich, Xodetaetl, PaulMuller, JasonMcz, kirosc, abou7mied, jmacioszek, DoobieD, Eluvade, dbvcode, pavlovdog, usama33, yanislk, learnathoner, vaielab, nickreese, Tuitio, grandmore, itnok, CollinEstes, sethyx, mstijak, MadDeveloper, balthazar, bitoiu, matthewwoop, robaleman, hems and others!
+As [TeamArga](https://argatechnology.com/) , we have been developing javascript, python, c # projects since 2015.
+Feel free to contact
+
+[buymeacoffee-shield]: https://www.buymeacoffee.com/assets/img/guidelines/download-assets-sm-2.svg
+[buymeacoffee]: https://www.buymeacoffee.com/metinkun
 
 ![Downloads](https://img.shields.io/npm/dt/node-binance-api-ext.svg?style=for-the-badge&maxAge=86400) ![Stars](https://img.shields.io/github/stars/metinkun/node-binance-api-ext.svg?style=for-the-badge&label=Stars) ![Contributors](https://img.shields.io/github/contributors/metinkun/node-binance-api-ext.svg?style=for-the-badge&maxAge=86400)
-[![Stargazers over time](https://starcharts.herokuapp.com/metinkun/node-binance-api-ext.svg)](https://starcharts.herokuapp.com/metinkun/node-binance-api-ext)
-
-[![Views](http://hits.dwyl.io/metinkun/node-binance-api-ext.svg)](http://hits.dwyl.io/metinkun/node-binance-api-ext)
