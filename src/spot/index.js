@@ -6,6 +6,8 @@ const {
   publicRequest,
   marketRequest,
   depthData,
+  pullKeys,
+  apiRequest,
 } = require('../common');
 
 module.exports = function (common) {
@@ -32,7 +34,7 @@ module.exports = function (common) {
    * @param {string} symbol - The symbol to buy or sell
    * @param {string} quantity - The quantity to buy or sell
    * @param {string} price - The price per unit to transact each unit at
-   * @param {object} flags - additional order settings
+   * @param {object} params - additional order settings
    * @param {function} callback - the callback function
    * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
@@ -42,11 +44,11 @@ module.exports = function (common) {
     symbol,
     quantity,
     price,
-    flags = {},
-    callback = false,
-    tempKeys
+    params = {},
+    callback = false
   ) => {
-    let endpoint = flags.type === 'OCO' ? 'v3/order/oco' : 'v3/order';
+    const tempKeys = pullKeys(params);
+    let endpoint = params.type === 'OCO' ? 'v3/order/oco' : 'v3/order';
     if (common.options.test) endpoint += '/test';
     let opt = {
       symbol: symbol,
@@ -54,7 +56,7 @@ module.exports = function (common) {
       type: 'LIMIT',
       quantity: quantity,
     };
-    if (typeof flags.type !== 'undefined') opt.type = flags.type;
+    if (typeof params.type !== 'undefined') opt.type = params.type;
     if (opt.type.includes('LIMIT')) {
       opt.price = price;
       if (opt.type !== 'LIMIT_MAKER') {
@@ -63,16 +65,16 @@ module.exports = function (common) {
     }
     if (opt.type === 'OCO') {
       opt.price = price;
-      opt.stopLimitPrice = flags.stopLimitPrice;
+      opt.stopLimitPrice = params.stopLimitPrice;
       opt.stopLimitTimeInForce = 'GTC';
       delete opt.type;
     }
-    if (typeof flags.timeInForce !== 'undefined')
-      opt.timeInForce = flags.timeInForce;
-    if (typeof flags.newOrderRespType !== 'undefined')
-      opt.newOrderRespType = flags.newOrderRespType;
-    if (typeof flags.newClientOrderId !== 'undefined')
-      opt.newClientOrderId = flags.newClientOrderId;
+    if (typeof params.timeInForce !== 'undefined')
+      opt.timeInForce = params.timeInForce;
+    if (typeof params.newOrderRespType !== 'undefined')
+      opt.newOrderRespType = params.newOrderRespType;
+    if (typeof params.newClientOrderId !== 'undefined')
+      opt.newClientOrderId = params.newClientOrderId;
 
     /*
      * STOP_LOSS
@@ -81,40 +83,20 @@ module.exports = function (common) {
      * TAKE_PROFIT_LIMIT
      * LIMIT_MAKER
      */
-    if (typeof flags.icebergQty !== 'undefined')
-      opt.icebergQty = flags.icebergQty;
-    if (typeof flags.stopPrice !== 'undefined') {
-      opt.stopPrice = flags.stopPrice;
+    if (typeof params.icebergQty !== 'undefined')
+      opt.icebergQty = params.icebergQty;
+    if (typeof params.stopPrice !== 'undefined') {
+      opt.stopPrice = params.stopPrice;
       if (opt.type === 'LIMIT')
         throw Error(
           'stopPrice: Must set "type" to one of the following: STOP_LOSS, STOP_LOSS_LIMIT, TAKE_PROFIT, TAKE_PROFIT_LIMIT'
         );
     }
-    signedRequest(
+    return signedRequest(
       common,
       common.base + endpoint,
       opt,
-      (error, response) => {
-        if (!response) {
-          if (callback) callback(error, response);
-          else common.options.log('Order() error:', error);
-          return;
-        }
-        if (
-          typeof response.msg !== 'undefined' &&
-          response.msg === 'Filter failure: MIN_NOTIONAL'
-        ) {
-          common.options.log(
-            'Order quantity too small. See exchangeInfo() for minimum amounts'
-          );
-        }
-        if (callback) callback(error, response);
-        else
-          common.options.log(
-            side + '(' + symbol + ',' + quantity + ',' + price + ') ',
-            response
-          );
-      },
+      callback,
       tempKeys,
       false,
       'POST'
@@ -126,7 +108,7 @@ module.exports = function (common) {
    * @param {array} data - array of symbols
    * @return {array} - symbols with their current prices
    */
-  const priceData = (data) => {
+  const priceParser = (data) => {
     const prices = {};
     if (Array.isArray(data)) {
       for (let obj of data) {
@@ -144,7 +126,7 @@ module.exports = function (common) {
    * @param {array} data - account info object
    * @return {object} - balances hel with available, onorder amounts
    */
-  const balanceData = (data) => {
+  const balanceParser = (data) => {
     let balances = {};
     if (typeof data === 'undefined') return {};
     if (typeof data.balances === 'undefined') {
@@ -152,7 +134,10 @@ module.exports = function (common) {
       return {};
     }
     for (let obj of data.balances) {
-      balances[obj.asset] = { available: obj.free, onOrder: obj.locked };
+      balances[obj.asset] = {
+        available: Number(obj.free),
+        total: Number(obj.free) + Number(obj.locked),
+      };
     }
     return balances;
   };
@@ -172,41 +157,42 @@ module.exports = function (common) {
       timeout: common.options.recvWindow,
     };
 
-    return request(addProxy(common, opt), callback, priceData);
+    return request(addProxy(common, opt), callback, priceParser);
   };
 
   /**
    * Get the balance data
+   * @param {{ APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.balance = function (callback, tempKeys) {
+  this.balance = function (params = {}, callback) {
     return signedRequest(
       common,
       common.base + 'v3/account',
-      {},
+      params,
       callback,
-      tempKeys,
-      balanceData
+      pullKeys(params),
+      balanceParser
     );
   };
 
   /**
    * Cancels an order
    * @param {string} symbol - the symbol to cancel
-   * @param {string} orderid - the orderid to cancel
+   * @param {{orderId: string, origClientOrderId: string, APIKEY: string, APISECRET: string }} params - additional parameters
+   * @param {object} params - the orderid or clientOrderID  is mandatory
    * @param {function} callback - the callback function
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.cancel = function (symbol, orderId, callback = false, tempKeys) {
+  this.cancel = function (symbol, params = {}, callback = false) {
+    params.symbol = symbol;
     return signedRequest(
       common,
       common.base + 'v3/order',
-      { symbol, orderId },
+      params,
       callback,
-      tempKeys,
+      pullKeys(params),
       false,
       'DELETE'
     );
@@ -215,42 +201,36 @@ module.exports = function (common) {
   /**
    * Gets the status of an order
    * @param {string} symbol - the symbol to check
-   * @param {string} orderId - the orderid to check
+   * @param {{orderId: string, origClientOrderId: string,
+   *  APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {object} flags - any additional flags
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.orderStatus = function (
-    symbol,
-    orderId,
-    callback,
-    flags = {},
-    tempKeys
-  ) {
-    let parameters = Object.assign({ symbol, orderId }, flags);
+  this.orderStatus = function (symbol, params = {}, callback) {
+    params.symbol = symbol;
     return signedRequest(
       common,
       common.base + 'v3/order',
-      parameters,
+      params,
       callback,
-      tempKeys
+      pullKeys(params)
     );
   };
 
   /**
    * Gets open orders
    * @param {string} symbol - the symbol to get
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.openOrders = function (symbol, callback, tempKeys) {
-    let parameters = symbol ? { symbol: symbol } : {};
+  this.openOrders = function (symbol, params = {}, callback) {
+    const tempKeys = pullKeys(params);
+    params = symbol ? { symbol, ...params } : {};
     return signedRequest(
       common,
       common.base + 'v3/openOrders',
-      parameters,
+      params,
       callback,
       tempKeys
     );
@@ -259,17 +239,18 @@ module.exports = function (common) {
   /**
    * Cancels all orders of a given symbol
    * @param {string} symbol - the symbol to cancel all orders for
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.cancelAll = function (symbol, callback = false, tempKeys) {
+  this.cancelAll = function (symbol, params = {}, callback) {
+    params.symbol = symbol;
     return signedRequest(
       common,
       common.base + 'v3/openOrders',
-      { symbol },
+      params,
       callback,
-      tempKeys,
+      pullKeys(params),
       false,
       'DELETE'
     );
@@ -278,20 +259,19 @@ module.exports = function (common) {
   /**
    * Cancels all orders of a given symbol
    * @param {string} symbol - the symbol to cancel all orders for
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.cancelOrders = function (symbol, callback = false, tempKeys) {
+  this.cancelOrders = function (symbol, params = {}, callback) {
+    params.symbol = symbol;
+    const tempKeys = pullKeys(params);
     let promise;
     if (!callback) {
       promise = new Promise((resolve, reject) => {
         callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
+          if (error) reject(error);
+          else resolve(response);
         };
       });
     }
@@ -299,29 +279,15 @@ module.exports = function (common) {
     const req = signedRequest(
       common,
       common.base + 'v3/openOrders',
-      { symbol: symbol },
+      params,
       function (error, json) {
-        if (json.length === 0) {
-          return callback('No orders present for this symbol', {});
-        }
+        if (error) return callback(error, json);
+        if (json.length === 0) return callback(false, {}); // no open orders
         for (let obj of json) {
-          let quantity = obj.origQty - obj.executedQty;
-          common.options.log(
-            'cancel order: ' +
-              obj.side +
-              ' ' +
-              symbol +
-              ' ' +
-              quantity +
-              ' @ ' +
-              obj.price +
-              ' #' +
-              obj.orderId
-          );
           signedRequest(
             common,
             common.base + 'v3/order',
-            { symbol: symbol, orderId: obj.orderId },
+            { ...params, orderId: obj.orderId },
             callback,
             tempKeys,
             false,
@@ -339,58 +305,39 @@ module.exports = function (common) {
   /**
    * Gets all order of a given symbol
    * @param {string} symbol - the symbol
+   * @param {{orderId: string, startTime: number, endTime: number,
+   * limit: number,APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {object} options - additional options
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.allOrders = function (symbol, callback, options = {}, tempKeys) {
-    let parameters = Object.assign({ symbol: symbol }, options);
+  this.allOrders = function (symbol, params = {}, callback) {
+    params.symbol = symbol;
     return signedRequest(
       common,
       common.base + 'v3/allOrders',
-      parameters,
+      params,
       callback,
-      tempKeys
+      pullKeys(params)
     );
   };
 
   /**
    * Gets the depth information for a given symbol
    * @param {string} symbol - the symbol
+   * @param {{limit: number,APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {int} limit - limit the number of returned orders
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.depth = function (symbol, callback, limit = 100) {
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        publicRequest(
-          common,
-          common.base + 'v3/depth',
-          { symbol, limit },
-          function (error, data) {
-            return callback.call(this, error, depthData(data), symbol);
-          }
-        );
-      });
-    } else {
-      publicRequest(
-        common,
-        common.base + 'v3/depth',
-        { symbol: symbol, limit: limit },
-        function (error, data) {
-          return callback.call(this, error, depthData(data), symbol);
-        }
-      );
-    }
+  this.depth = function (symbol, params = {}, callback) {
+    params.symbol = symbol;
+    return publicRequest(
+      common,
+      common.base + 'v3/depth',
+      params,
+      callback,
+      pullKeys(params),
+      depthData
+    );
   };
 
   /**
@@ -399,7 +346,7 @@ module.exports = function (common) {
    * @param {string} symbol - the symbol to buy
    * @param {numeric} quantity - the quantity required
    * @param {numeric} price - the price to pay for each unit
-   * @param {object} flags - aadditionalbuy order flags
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
@@ -408,23 +355,10 @@ module.exports = function (common) {
     symbol,
     quantity,
     price,
-    flags = {},
+    params = {},
     callback = false
   ) {
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        order(side, symbol, quantity, price, flags, callback);
-      });
-    } else {
-      order(side, symbol, quantity, price, flags, callback);
-    }
+    return order(side, symbol, quantity, price, params, callback);
   };
 
   /**
@@ -432,25 +366,12 @@ module.exports = function (common) {
    * @param {string} symbol - the symbol to buy
    * @param {numeric} quantity - the quantity required
    * @param {numeric} price - the price to pay for each unit
-   * @param {object} flags - additional buy order flags
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.buy = function (symbol, quantity, price, flags = {}, callback = false) {
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        order('BUY', symbol, quantity, price, flags, callback);
-      });
-    } else {
-      order('BUY', symbol, quantity, price, flags, callback);
-    }
+  this.buy = function (symbol, quantity, price, params = {}, callback) {
+    return order('BUY', symbol, quantity, price, params, callback);
   };
 
   /**
@@ -458,97 +379,48 @@ module.exports = function (common) {
    * @param {string} symbol - the symbol to sell
    * @param {numeric} quantity - the quantity required
    * @param {numeric} price - the price to sell each unit for
-   * @param {object} flags - additional order flags
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.sell = function (symbol, quantity, price, flags = {}, callback = false) {
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        order('SELL', symbol, quantity, price, flags, callback);
-      });
-    } else {
-      order('SELL', symbol, quantity, price, flags, callback);
-    }
+  this.sell = function (symbol, quantity, price, params = {}, callback) {
+    return order('SELL', symbol, quantity, price, params, callback);
   };
 
   /**
    * Creates a market buy order
    * @param {string} symbol - the symbol to buy
    * @param {numeric} quantity - the quantity required
-   * @param {object} flags - additional buy order flags
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.marketBuy = function (
-    symbol,
-    quantity,
-    flags = { type: 'MARKET' },
-    callback = false
-  ) {
-    if (typeof flags === 'function') {
+  this.marketBuy = function (symbol, quantity, params = {}, callback) {
+    if (typeof params === 'function') {
       // Accept callback as third parameter
-      callback = flags;
-      flags = { type: 'MARKET' };
+      callback = params;
+      params = { type: 'MARKET' };
     }
-    if (typeof flags.type === 'undefined') flags.type = 'MARKET';
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        order('BUY', symbol, quantity, 0, flags, callback);
-      });
-    } else {
-      order('BUY', symbol, quantity, 0, flags, callback);
-    }
+    if (typeof params.type === 'undefined') params.type = 'MARKET';
+    return order('BUY', symbol, quantity, 0, params, callback);
   };
 
   /**
    * Creates a market sell order
    * @param {string} symbol - the symbol to sell
    * @param {numeric} quantity - the quantity required
-   * @param {object} flags - additional sell order flags
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.marketSell = function (
-    symbol,
-    quantity,
-    flags = { type: 'MARKET' },
-    callback = false
-  ) {
-    if (typeof flags === 'function') {
+  this.marketSell = function (symbol, quantity, params = {}, callback) {
+    if (typeof params === 'function') {
       // Accept callback as third parameter
-      callback = flags;
-      flags = { type: 'MARKET' };
+      callback = params;
+      params = { type: 'MARKET' };
     }
-    if (typeof flags.type === 'undefined') flags.type = 'MARKET';
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        order('SELL', symbol, quantity, 0, flags, callback);
-      });
-    } else {
-      order('SELL', symbol, quantity, 0, flags, callback);
-    }
+    if (typeof params.type === 'undefined') params.type = 'MARKET';
+    return order('SELL', symbol, quantity, 0, params, callback);
   };
 
   /**
@@ -591,34 +463,21 @@ module.exports = function (common) {
    */
   this.prevDay = function (symbol, callback) {
     let input = symbol ? { symbol: symbol } : {};
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        publicRequest(
-          common,
-          common.base + 'v3/ticker/24hr',
-          input,
-          (error, data) => {
-            return callback.call(this, error, data, symbol);
-          }
-        );
-      });
-    } else {
-      publicRequest(
-        common,
-        common.base + 'v3/ticker/24hr',
-        input,
-        (error, data) => {
-          return callback.call(this, error, data, symbol);
-        }
-      );
-    }
+    return publicRequest(
+      common,
+      common.base + 'v3/ticker/24hr',
+      input,
+      callback
+    );
+  };
+
+  /**
+   * Gets the time
+   * @param {function} callback - the callback function
+   * @return {promise or undefined} - omitting the callback returns a promise
+   */
+  this.time = function (callback) {
+    return apiRequest(common, common.base + 'v3/time', {}, callback);
   };
 
   /**
@@ -627,131 +486,72 @@ module.exports = function (common) {
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.exchangeInfo = function (callback) {
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        publicRequest(common, common.base + 'v3/exchangeInfo', {}, callback);
-      });
-    } else {
-      publicRequest(common, common.base + 'v3/exchangeInfo', {}, callback);
-    }
+    return publicRequest(common, common.base + 'v3/exchangeInfo', {}, callback);
   };
 
   /**
    * Get the account
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {function} callback - the callback function
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.account = function (callback, tempKeys) {
+  this.account = function (params = {}, callback) {
     return signedRequest(
       common,
       common.base + 'v3/account',
-      {},
+      params,
       callback,
-      tempKeys
+      pullKeys(params)
     );
   };
 
   /**
    * Get trades for a given symbol
    * @param {string} symbol - the symbol
+   * @param {{startTime: number, endTime: number, fromId:number, limit: number,
+   * APIKEY: string, APISECRET: string }} params  - additional params
    * @param {function} callback - the callback function
-   * @param {object} options - additional options
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
-  this.trades = (symbol, callback, options = {}, tempKeys) => {
-    let parameters = Object.assign({ symbol: symbol }, options);
+  this.trades = (symbol, params = {}, callback) => {
+    params.symbol = symbol;
     return signedRequest(
       common,
       common.base + 'v3/myTrades',
-      parameters,
+      params,
       callback,
-      tempKeys
+      pullKeys(params)
     );
   };
 
   /**
    * Get the historical trade info
    * @param {string} symbol - the symbol
+   * @param {{fromId:number, limit: number }} params  - additional params
    * @param {function} callback - the callback function
-   * @param {int} limit - limit the number of items returned
-   * @param {int} fromId - from this id
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.historicalTrades = function (
-    symbol,
-    callback,
-    limit = 500,
-    fromId = false
-  ) {
-    let parameters = { symbol: symbol, limit: limit };
-    if (fromId) parameters.fromId = fromId;
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        marketRequest(
-          common,
-          common.base + 'v3/historicalTrades',
-          parameters,
-          callback
-        );
-      });
-    } else {
-      marketRequest(
-        common,
-        common.base + 'v3/historicalTrades',
-        parameters,
-        callback
-      );
-    }
+  this.historicalTrades = function (symbol, params = {}, callback) {
+    params.symbol = symbol;
+
+    return marketRequest(
+      common,
+      common.base + 'v3/historicalTrades',
+      params,
+      callback
+    );
   };
 
   /**
    * Get the recent trades
    * @param {string} symbol - the symbol
+   * @param {{startTime: number, endTime: number, fromId:number, limit: number}} params  - additional params
    * @param {function} callback - the callback function
-   * @param {int} limit - limit the number of items returned
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.recentTrades = function (symbol, callback, limit = 500) {
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        marketRequest(
-          common,
-          common.base + 'v1/trades',
-          { symbol: symbol, limit: limit },
-          callback
-        );
-      });
-    } else {
-      marketRequest(
-        common,
-        common.base + 'v1/trades',
-        { symbol: symbol, limit: limit },
-        callback
-      );
-    }
+  this.recentTrades = function (symbol, params = {}, callback) {
+    params.symbol = symbol;
+    return marketRequest(common, common.base + 'v1/trades', params, callback);
   };
 
   /**
@@ -759,70 +559,33 @@ module.exports = function (common) {
    * intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
    * @param {string} symbol - the symbol
    * @param {function} interval - the callback function
+   * @param {{startTime: number, endTime: number, limit: number}} params  - additional params
    * @param {function} callback - the callback function
-   * @param {object} options - additional options
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.candlesticks = function (
     symbol,
     interval = '5m',
-    callback = false,
-    options = { limit: 500 }
+    params = {},
+    callback = false
   ) {
-    let params = Object.assign({ symbol: symbol, interval: interval }, options);
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        publicRequest(common, common.base + 'v3/klines', params, function (
-          error,
-          data
-        ) {
-          return callback.call(this, error, data, symbol);
-        });
-      });
-    } else {
-      publicRequest(common, common.base + 'v3/klines', params, function (
-        error,
-        data
-      ) {
-        return callback.call(this, error, data, symbol);
-      });
-    }
+    params = Object.assign({ symbol: symbol, interval: interval }, params);
+    return publicRequest(common, common.base + 'v3/klines', params, callback);
   };
   /**
    * Get agg trades for given symbol
    * @param {string} symbol - the symbol
-   * @param {object} options - addtional optoins
+   * @param {{startTime: number, endTime: number, fromId:number, limit: number}} params  - additional params
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.aggTrades = function (symbol, options = {}, callback = false) {
-    //fromId startTime endTime limit
-    let parameters = Object.assign({ symbol }, options);
-    if (!callback) {
-      return new Promise((resolve, reject) => {
-        callback = (error, response) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(response);
-          }
-        };
-        marketRequest(
-          common,
-          common.base + 'v3/aggTrades',
-          parameters,
-          callback
-        );
-      });
-    } else {
-      marketRequest(common, common.base + 'v3/aggTrades', parameters, callback);
-    }
+  this.aggTrades = function (symbol, params = {}, callback = false) {
+    params.symbol = symbol;
+    return marketRequest(
+      common,
+      common.base + 'v3/aggTrades',
+      params,
+      callback
+    );
   };
 };

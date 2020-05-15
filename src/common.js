@@ -105,6 +105,17 @@ const addProxy = (common, opt) => {
 //   return cb(null, JSON.parse(body));
 // };
 
+const pullKeys = (params) => {
+  const keys = { APIKEY: params.APIKEY, APISECRET: params.APISECRET };
+  delete params.APIKEY;
+  delete params.APISECRET;
+  return keys;
+};
+
+const filterParams = (params) => {
+  for (let key in params) if (!params[key]) delete params[key];
+};
+
 const makeQueryString = (q) =>
   Object.keys(q)
     .reduce((a, k) => {
@@ -216,19 +227,14 @@ const signedRequest = (
   //"a82b8ca39dda567b9f88ec5a0ffd746fde079e4896363fb603320d3aeeaf6bfe"
   let opt;
   if (method === 'POST') {
-    opt = reqObjPOST(
-      common,
-      url + '?signature=' + signature,
-      data,
-      common.options.APIKEY
-    );
+    opt = reqObjPOST(common, url + '?signature=' + signature, data, apiKey);
   } else {
     opt = reqObj(
       common,
       url + '?' + query + '&signature=' + signature,
       data,
       method,
-      common.options.APIKEY,
+      apiKey,
       !query
     );
   }
@@ -276,21 +282,34 @@ const request = (reqObj, callBack, parser) => {
   if (promise) return promise;
 };
 
-const promiseRequest = async (common, url, data = {}, flags = {}) => {
+const promiseRequest = async (
+  common,
+  url,
+  data = {},
+  flags = {},
+  callback,
+  parser
+) => {
   let query = '',
     headers = {
       'User-Agent': common.userAgent,
       'Content-type': 'application/x-www-form-urlencoded',
     };
+  const tempKeys = pullKeys(data);
+  let apiKey, secretKey;
+  if (tempKeys && tempKeys.APIKEY) apiKey = tempKeys.APIKEY;
+  else if (common.options.APIKEY) apiKey = common.options.APIKEY;
+
+  if (tempKeys && tempKeys.APISECRET) secretKey = tempKeys.APISECRET;
+  else if (common.options.APISECRET) secretKey = common.options.APISECRET;
   if (typeof flags.method === 'undefined') flags.method = 'GET'; // GET POST PUT DELETE
   if (typeof flags.type === 'undefined') flags.type = false;
   // TRADE, SIGNED, MARKET_DATA, USER_DATA, USER_STREAM
   else {
     if (typeof data.recvWindow === 'undefined')
       data.recvWindow = common.options.recvWindow;
-    headers['X-MBX-APIKEY'] = common.options.APIKEY;
-    if (!common.options.APIKEY)
-      return new Promise((res, rej) => rej('Invalid API KEY'));
+    headers['X-MBX-APIKEY'] = apiKey;
+    if (!apiKey) return new Promise((res, rej) => rej('Invalid API KEY'));
   }
   let baseURL = typeof flags.base === 'undefined' ? common.base : flags.base;
   if (common.options.test && baseURL === common.fapi) baseURL = common.fapiTest;
@@ -306,21 +325,21 @@ const promiseRequest = async (common, url, data = {}, flags = {}) => {
     flags.type === 'TRADE' ||
     flags.type === 'USER_DATA'
   ) {
-    if (!common.options.APISECRET)
-      return new Promise((res, rej) => rej('Invalid API Secret'));
+    if (!secretKey) return new Promise((res, rej) => rej('Invalid API Secret'));
     data.timestamp = new Date().getTime() + common.info.timeOffset;
     query = makeQueryString(data);
     data.signature = crypto
-      .createHmac('sha256', common.options.APISECRET)
+      .createHmac('sha256', secretKey)
       .update(query)
       .digest('hex'); // HMAC hash header
     opt.url = `${baseURL}${url}?${query}&signature=${data.signature}`;
   } else opt.params = data;
-  return request(addProxy(common, opt));
+  return request(addProxy(common, opt), callback, parser);
 };
 
 /**
  * Make market request
+ * @param {object} common - common private object
  * @param {string} url - The http endpoint
  * @param {object} data - The data to send
  * @param {function} callback - The callback method to call
@@ -338,7 +357,7 @@ const marketRequest = (common, url, data = {}, callback, method = 'GET') => {
     common.options.APIKEY,
     false
   );
-  proxyRequest(common, opt, callback);
+  return proxyRequest(common, opt, callback);
 };
 
 /**
@@ -351,7 +370,7 @@ const marketRequest = (common, url, data = {}, callback, method = 'GET') => {
  */
 const publicRequest = (common, url, data = {}, callback, method = 'GET') => {
   let opt = reqObj(common, url, data, method, false, true);
-  proxyRequest(common, opt, callback);
+  return proxyRequest(common, opt, callback);
 };
 
 /**
@@ -380,6 +399,8 @@ const depthData = (data) => {
 module.exports = {
   createCommon,
   setOptions,
+  pullKeys,
+  filterParams,
   request,
   proxyRequest,
   apiRequest,

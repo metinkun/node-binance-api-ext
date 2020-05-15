@@ -1,4 +1,3 @@
-
 const {
   createCommon,
   setOptions,
@@ -6,6 +5,7 @@ const {
   apiRequest,
   signedRequest,
   promiseRequest,
+  pullKeys,
 } = require('./common');
 
 const main = function Main(common) {
@@ -289,16 +289,14 @@ const main = function Main(common) {
       common.info.timeOffset = data.serverTime - Date.now();
       return data;
     };
-    return apiRequest(common, common.base + 'v3/time', {}, callback,false, parser);
-  };
-
-  /**
-   * Gets the time
-   * @param {function} callback - the callback function
-   * @return {promise or undefined} - omitting the callback returns a promise
-   */
-  this.time = function (callback) {
-    return apiRequest(common, common.base + 'v3/time', {}, callback);
+    return apiRequest(
+      common,
+      common.base + 'v3/time',
+      {},
+      callback,
+      false,
+      parser
+    );
   };
 
   /**
@@ -375,11 +373,13 @@ const main = function Main(common) {
   /**
    * Queries the futures API by default
    * @param {string} url - the signed api endpoint
-   * @param {object} data - the data to send
+   * @param {{APIKEY: string, APISECRET: string }} params - additional parameters
    * @param {object} flags - type of request, authentication method and endpoint url
+   * @param {function} callback - the callback function
+   * @return {?promise} returs promise if callback is not defined
    */
-  this.promiseRequest = function (url, data = {}, flags = {}) {
-    return promiseRequest(common, url, data, flags);
+  this.promiseRequest = function (url, params = {}, flags = {}, callback) {
+    return promiseRequest(common, url, params, flags,callback);
   };
 
   /**
@@ -389,7 +389,6 @@ const main = function Main(common) {
    * @param {function} callback - the callback function
    * @param {string} method - the http method
    * @param {boolean} noDataInSignature - Prevents data from being added to signature
-   * @param {object} tempKeys - temporary keys
    * @return {?promise} returs promise if callback is not defined
    */
   this.signedRequest = function (
@@ -397,15 +396,14 @@ const main = function Main(common) {
     data,
     callback,
     method = 'GET',
-    noDataInSignature = false,
-    tempKeys
+    noDataInSignature = false
   ) {
     return signedRequest(
       common,
       url,
       data,
       callback,
-      tempKeys,
+      pullKeys(data),
       false,
       method,
       noDataInSignature
@@ -431,14 +429,18 @@ const main = function Main(common) {
 
   /**
    * Get the account binance lending information
+   * @param {object} params - additional params
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.lending = async (params = {}) => {
-    return promiseRequest(common, 'v1/lending/union/account', params, {
-      base: common.sapi,
-      type: 'SIGNED',
-    });
+  this.lending = async (params = {}, callback) => {
+    return promiseRequest(
+      common,
+      'v1/lending/union/account',
+      params,
+      { base: common.sapi, type: 'SIGNED' },
+      callback
+    );
   };
 
   // futures websockets support: ticker bookTicker miniTicker aggTrade markPrice

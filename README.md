@@ -1,10 +1,20 @@
-[![Downloads](https://img.shields.io/npm/dm/node-binance-api-ext.svg?labelColor=blueviolet)](https://npm-stat.com/charts.html?package=node-binance-api-ext&from=2020-01-01&to=2021-01-01) [![GitHub last commit](https://img.shields.io/github/last-commit/metinkun/node-binance-api-ext.svg?maxAge=2400)](#) [![Latest Version](https://img.shields.io/github/release/metinkun/node-binance-api-ext.svg?style=flat-square)](https://github.com/metinkun/node-binance-api-ext/releases)  <!-- [![npm downloads](https://img.shields.io/npm/dt/node-binance-api.svg?maxAge=7200)](https://www.npmjs.com/package/node-binance-api) [![Build Status](https://travis-ci.org/metinkun/node-binance-api.svg?branch=master&style=flat-square)](https://travis-ci.org/metinkun/node-binance-api) [![Coverage Status](https://coveralls.io/repos/github/metinkun/node-binance-api/badge.svg?branch=master&style=flat-square)](https://coveralls.io/github/metinkun/node-binance-api) [![CodeCov](https://codecov.io/gh/metinkun/node-binance-api/branch/master/graph/badge.svg?style=flat-square)](https://codecov.io/github/metinkun/node-binance-api/) [![Codacy Badge](https://api.codacy.com/project/badge/Coverage/996757cec66542c0a64fca2b4cf8a936)](https://www.codacy.com/app/metinkun/node-binance-api?utm_source=github.com&utm_medium=referral&utm_content=metinkun/node-binance-api&utm_campaign=Badge_Coverage) [![Codacy Grade](https://api.codacy.com/project/badge/Grade/996757cec66542c0a64fca2b4cf8a936)](https://www.codacy.com/app/metinkun/node-binance-api) -->
+[![Downloads](https://img.shields.io/npm/dm/node-binance-api-ext.svg?labelColor=blueviolet)](https://npm-stat.com/charts.html?package=node-binance-api-ext&from=2020-01-01&to=2021-01-01) [![GitHub last commit](https://img.shields.io/github/last-commit/metinkun/node-binance-api-ext.svg?maxAge=2400)](#) [![Latest Version](https://img.shields.io/github/release/metinkun/node-binance-api-ext.svg?style=flat-square)](https://github.com/metinkun/node-binance-api-ext/releases) <!-- [![npm downloads](https://img.shields.io/npm/dt/node-binance-api.svg?maxAge=7200)](https://www.npmjs.com/package/node-binance-api) [![Build Status](https://travis-ci.org/metinkun/node-binance-api.svg?branch=master&style=flat-square)](https://travis-ci.org/metinkun/node-binance-api) [![Coverage Status](https://coveralls.io/repos/github/metinkun/node-binance-api/badge.svg?branch=master&style=flat-square)](https://coveralls.io/github/metinkun/node-binance-api) [![CodeCov](https://codecov.io/gh/metinkun/node-binance-api/branch/master/graph/badge.svg?style=flat-square)](https://codecov.io/github/metinkun/node-binance-api/) [![Codacy Badge](https://api.codacy.com/project/badge/Coverage/996757cec66542c0a64fca2b4cf8a936)](https://www.codacy.com/app/metinkun/node-binance-api?utm_source=github.com&utm_medium=referral&utm_content=metinkun/node-binance-api&utm_campaign=Badge_Coverage) [![Codacy Grade](https://api.codacy.com/project/badge/Grade/996757cec66542c0a64fca2b4cf8a936)](https://www.codacy.com/app/metinkun/node-binance-api) -->
 
 [![NPM](https://nodei.co/npm/node-binance-api-ext.png?compact=true)](https://npmjs.org/package/node-binance-api-ext)
 
 # Node Binance API Ext
 
-This project is designed to help you make your own projects that interact with the [Binance API](https://github.com/binance-exchange/binance-official-api-docs). You can stream candlestick chart data, market depth, or use other advanced features such as setting stop losses and iceberg orders. This project seeks to have complete API coverage including WebSockets.
+This project is designed to help you make your own projects that interact with the [Binance API](https://github.com/binance-exchange/binance-official-api-docs). You can stream candlestick chart data, market depth, or use other advanced features such as setting stop losses and iceberg orders. This project seeks to have complete API coverage including WebSockets. With full documented functions and intellisense support , it is easy to use
+
+--FEATURES
+*All functions has extended documentation
+*All functions has callback and promise support
+*All possible parameters and enums are in intellisense
+*All functions has temporary apikey-secretkey support
+\*Futures stoplimit and stopmarket functions added
+
+--TODO
+\*Weigth rate controlling and rate limit support
 
 <b><p align="center">
 <a href="#binance-futures-api" style="color:#f9c513">Futures API</a> &amp;
@@ -89,10 +99,34 @@ console.info(await binance.futures.marketSell('TRXUSDT', 1));
 console.info(await binance.futures.buy('BTCUSDT', 0.1, 8222));
 ```
 
+#### Futures Stop Limit Buy
+
+```js
+console.info(await binance.futures.stopLimitBuy('BTCUSDT', 0.1, 8222, 8222));
+```
+
+#### Futures Stop Market Buy
+
+```js
+console.info(await binance.futures.stopMarketBuy('BTCUSDT', 0.1, 8223));
+```
+
 #### Futures Limit Sell
 
 ```js
 console.info(await binance.futures.sell('BTCUSDT', 0.5, 11111));
+```
+
+#### Futures Stop Limit Sell
+
+```js
+console.info(await binance.futures.stopLimitSell('BTCUSDT', 0.1, 8222, 8222));
+```
+
+#### Futures Stop Market Sell
+
+```js
+console.info(await binance.futures.stopMarketSell('BTCUSDT', 0.1, 8223));
 ```
 
 #### Futures reduceOnly Order Example
@@ -127,6 +161,27 @@ console.info(await binance.futures.marginType('BTCUSDT', 'ISOLATED'));
 console.info(await binance.futures.positionMargin('TRXUSDT', amount, type));
 ```
 
+#### Temporary Api Keys Support
+
+```js
+//Uses apikeys from options
+binance.futures.sell('BTCUSDT', 0.5, 11111));
+
+//Uses temporary apikeys
+binance.futures.sell('BTCUSDT', 0.5, 11111{
+  APIKEY:"adasdsad",
+  APISECRET:"aasdavasver"
+  }));
+
+//Uses temporary apikeys with other parameters
+binance.futures.marketBuy("BTCUSDT", 0.5, {
+    reduceOnly: true,
+    APIKEY:"mklsvdmklsdv",
+    APISECRET:"nbafbaeasacsas"
+  });
+
+```
+
 #### Futures Prices
 
 ```js
@@ -152,7 +207,9 @@ console.info(await binance.futures.historicalTrades('XMRUSDT'));
 console.info(await binance.futures.leverageBracket('LINKUSDT'));
 console.info(await binance.futures.income());
 console.info(await binance.futures.cancelAll('BTCUSDT'));
-console.info(await binance.futures.cancel('BTCUSDT', { orderId: '1025137386' }));
+console.info(
+  await binance.futures.cancel('BTCUSDT', { orderId: '1025137386' })
+);
 console.info(
   await binance.futures.orderStatus('BTCUSDT', { orderId: '1025137386' })
 );
@@ -1340,10 +1397,16 @@ binance.spot.marketSell('ETHBTC', quantity);
 ```javascript
 let quantity = 5,
   price = 0.0040203;
-binance.spot.buy('BNBETH', quantity, price, { type: 'LIMIT' }, (error, response) => {
-  console.info('Limit Buy response', response);
-  console.info('order id: ' + response.orderId);
-});
+binance.spot.buy(
+  'BNBETH',
+  quantity,
+  price,
+  { type: 'LIMIT' },
+  (error, response) => {
+    console.info('Limit Buy response', response);
+    console.info('order id: ' + response.orderId);
+  }
+);
 ```
 
 <details>
@@ -1409,7 +1472,10 @@ let type = 'STOP_LOSS';
 let quantity = 1;
 let price = 0.069;
 let stopPrice = 0.068;
-binance.spot.sell('ETHBTC', quantity, price, { stopPrice: stopPrice, type: type });
+binance.spot.sell('ETHBTC', quantity, price, {
+  stopPrice: stopPrice,
+  type: type,
+});
 ```
 
 #### Placing an ICEBERG order
@@ -2090,9 +2156,7 @@ let lendingData = await binance.lending();
 > [newOrderRespType example](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#neworderresptype-example-when-placing-orders)\
 > [Recent Trades (historicalTrades, recentTrades, aggTrades functions)](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#recent-trades-historicaltrades-recenttrades-aggtrades-functions)\
 > [Terminate WebSocket connections](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#terminate-websocket-connections)\
-> [User Data: Account Balance Updates, Trade Updates, New Orders, Filled Orders, Cancelled Orders via WebSocket](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#user-data-account-balance-updates-trade-updates-new-orders-filled-orders-cancelled-orders-via-websocket)
-> [Margin User Data: Account Balance Updates, Trade Updates, New Orders, Filled Orders, Cancelled Orders via WebSocket](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#margin-user-data-account-balance-updates-trade-updates-new-orders-filled-orders-cancelled-orders-via-websocket)
-> [Asynchronous Syntax Options](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#asynchronous-syntax-options)
+> [User Data: Account Balance Updates, Trade Updates, New Orders, Filled Orders, Cancelled Orders via WebSocket](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#user-data-account-balance-updates-trade-updates-new-orders-filled-orders-cancelled-orders-via-websocket) > [Margin User Data: Account Balance Updates, Trade Updates, New Orders, Filled Orders, Cancelled Orders via WebSocket](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#margin-user-data-account-balance-updates-trade-updates-new-orders-filled-orders-cancelled-orders-via-websocket) > [Asynchronous Syntax Options](https://github.com/metinkun/node-binance-api-ext/blob/master/examples/advanced.md#asynchronous-syntax-options)
 
 ### Troubleshooting
 
@@ -2146,4 +2210,3 @@ binance.setOption('verbose', true);
 [![Stargazers over time](https://starcharts.herokuapp.com/metinkun/node-binance-api-ext.svg)](https://starcharts.herokuapp.com/metinkun/node-binance-api-ext)
 
 [![Views](http://hits.dwyl.io/metinkun/node-binance-api-ext.svg)](http://hits.dwyl.io/metinkun/node-binance-api-ext)
-
