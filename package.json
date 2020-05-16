@@ -8,6 +8,7 @@
     "axios": "^0.19.2",
     "https-proxy-agent": "^3.0.1",
     "qs": "^6.9.4",
+    "rate-limit-ext": "^2.0.3",
     "socks-proxy-agent": "^4.0.2",
     "string-hash": "^1.1.3",
     "url": "^0.11.0",
