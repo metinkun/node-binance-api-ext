@@ -22,11 +22,12 @@ With full documented functions and intellisense support , it is easy to use
 
 \*All functions has temporary apikey-secretkey support
 
-\*Futures stoplimit and stopmarket functions added
+\*🌟Futures stoplimit and stopmarket functions added
+
+\*🌟🌟🌟Request weight based rate limiting ( no more ip bans)
+
 
 --TODO
-
-\*Weigth rate controlling and rate limit support
 
 \*Automatic syncronize timestamp if server throws timestamp error
 
@@ -61,6 +62,12 @@ const binance = new Binance().options({
 ```
 
 # Binance Futures API
+
+#### syncronize api time with binance
+
+```js
+await binance.useServerTime();
+```
 
 #### Get Futures Positions
 
