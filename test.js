@@ -495,15 +495,15 @@ describe('Orders', function () {
 
 describe('Prevday all symbols', function () {
   it('Attempt get prevday trade status for all symbols', function (done) {
-    binance.spot.prevDay(false, (error, prevDay) => {
+    binance.spot.daily(false, (error, daily) => {
       debug(error);
-      debug(prevDay);
+      debug(daily);
       assert(typeof error === 'object', WARN_SHOULD_BE_OBJ);
-      assert(typeof prevDay === 'object', WARN_SHOULD_BE_OBJ);
+      assert(typeof daily === 'object', WARN_SHOULD_BE_OBJ);
       assert(error === null, WARN_SHOULD_BE_NULL);
-      assert(prevDay !== null, WARN_SHOULD_BE_NOT_NULL);
+      assert(daily !== null, WARN_SHOULD_BE_NOT_NULL);
       assert(
-        Object.keys(prevDay).length >= num_pairs,
+        Object.keys(daily).length >= num_pairs,
         'should at least ' + num_pairs + 'currency pairs?'
       );
 
@@ -529,7 +529,7 @@ describe('Prevday all symbols', function () {
         'lastId',
         'count',
       ];
-      prevDay.forEach(function (obj) {
+      daily.forEach(function (obj) {
         members.forEach(function (key) {
           assert(
             Object.prototype.hasOwnProperty.call(obj, key),
@@ -544,13 +544,13 @@ describe('Prevday all symbols', function () {
 
 describe('Prevday', function () {
   it('Attempt get prevday trade status for given symbol', function (done) {
-    binance.spot.prevDay('BNBBTC', (error, prevDay) => {
+    binance.spot.daily('BNBBTC', (error, daily) => {
       debug(error);
-      debug(prevDay);
+      debug(daily);
       assert(typeof error === 'object', WARN_SHOULD_BE_OBJ);
-      assert(typeof prevDay === 'object', WARN_SHOULD_BE_OBJ);
+      assert(typeof daily === 'object', WARN_SHOULD_BE_OBJ);
       assert(error === null, WARN_SHOULD_BE_NULL);
-      assert(prevDay !== null, WARN_SHOULD_BE_NOT_NULL);
+      assert(daily !== null, WARN_SHOULD_BE_NOT_NULL);
 
       let members = [
         'symbol',
@@ -576,7 +576,7 @@ describe('Prevday', function () {
       ];
       members.forEach(function (key) {
         assert(
-          Object.prototype.hasOwnProperty.call(prevDay, key),
+          Object.prototype.hasOwnProperty.call(daily, key),
           WARN_SHOULD_HAVE_KEY + key
         );
       });
@@ -1509,13 +1509,13 @@ describe('Staggered Websocket array depthcache', function () {
   });
 });
 
-describe('Websocket prevDay', function () {
+describe('Websocket daily', function () {
   let response;
   let cnt = 0;
 
   beforeEach(function (done) {
     this.timeout(TIMEOUT);
-    binance.webSocket.prevDay(false, (a_response) => {
+    binance.webSocket.daily(false, (a_response) => {
       cnt++;
       if (cnt > 1) return;
       stopSockets();
@@ -1524,18 +1524,18 @@ describe('Websocket prevDay', function () {
     });
   });
 
-  it('Calls prevDay websocket for symbol', function () {
+  it('Calls daily websocket for symbol', function () {
     assert(typeof response === 'object', WARN_SHOULD_BE_OBJ);
   });
 });
 
-describe('Websocket prevDay array', function () {
+describe('Websocket daily array', function () {
   let response;
   let cnt = 0;
 
   beforeEach(function (done) {
     this.timeout(TIMEOUT);
-    binance.webSocket.prevDay(['BNBBTC', 'TRXBTC'], (a_response) => {
+    binance.webSocket.daily(['BNBBTC', 'TRXBTC'], (a_response) => {
       cnt++;
       if (cnt > 1) return;
       stopSockets();
@@ -1544,18 +1544,18 @@ describe('Websocket prevDay array', function () {
     });
   });
 
-  it('Calls prevDay websocket for array of symbols', function () {
+  it('Calls daily websocket for array of symbols', function () {
     assert(typeof response === 'object', WARN_SHOULD_BE_OBJ);
   });
 });
 
-describe('Websocket prevDay single symbol', function () {
+describe('Websocket daily single symbol', function () {
   let response;
   let cnt = 0;
 
   beforeEach(function (done) {
     this.timeout(TIMEOUT);
-    binance.webSocket.prevDay('BNBBTC', (a_response) => {
+    binance.webSocket.daily('BNBBTC', (a_response) => {
       cnt++;
       if (cnt > 1) return;
       stopSockets();
@@ -1564,7 +1564,7 @@ describe('Websocket prevDay single symbol', function () {
     });
   });
 
-  it('Calls prevDay websocket for a single symbol', function () {
+  it('Calls daily websocket for a single symbol', function () {
     assert(typeof response === 'object', WARN_SHOULD_BE_OBJ);
   });
 });
@@ -1576,22 +1576,18 @@ describe('Websocket chart', function () {
   let cnt = 0;
   beforeEach(function (done) {
     this.timeout(TIMEOUT);
-    binance.webSocket.chart(
-      'BNBBTC',
-      '1m',
-      (a_symbol, a_interval, a_chart) => {
-        cnt++;
-        if (cnt > 1) {
-          stopSockets();
-          return;
-        }
-        chart = a_chart;
-        interval = a_interval;
-        symbol = a_symbol;
+    binance.webSocket.chart('BNBBTC', '1m', (a_symbol, a_interval, a_chart) => {
+      cnt++;
+      if (cnt > 1) {
         stopSockets();
-        done();
+        return;
       }
-    );
+      chart = a_chart;
+      interval = a_interval;
+      symbol = a_symbol;
+      stopSockets();
+      done();
+    });
   });
 
   it('Calls chart websocket', function () {

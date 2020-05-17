@@ -379,7 +379,7 @@ const main = function Main(common) {
    * @return {?promise} returs promise if callback is not defined
    */
   this.promiseRequest = function (url, params = {}, flags = {}, callback) {
-    return promiseRequest(common, url, params, flags,callback);
+    return promiseRequest(common, url, params, flags, callback);
   };
 
   /**

@@ -66,9 +66,9 @@ binance.exchangeInfo(function (response) {
 #### Connect to all WebSockets at once (Thanks keith1024!)
 
 ```js
-binance.prevDay(false, (error, prevDay) => {
+binance.daily(false, (error, daily) => {
   let markets = [];
-  for (let obj of prevDay) {
+  for (let obj of daily) {
     let symbol = obj.symbol;
     console.log(
       symbol +
@@ -297,8 +297,8 @@ binance.withdraw(
 
 ### Proxy Support
 
-For the standard REST API the https_proxy or socks_proxy variable is honoured
-_NOTE_ proxy package has no dns name support, please use proxy IP address
+For the standard REST API the https*proxy or socks_proxy variable is honoured
+\_NOTE* proxy package has no dns name support, please use proxy IP address
 
 **Linux**
 

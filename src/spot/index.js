@@ -484,7 +484,7 @@ module.exports = function (common) {
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
-  this.prevDay = function (symbol, callback) {
+  this.daily = function (symbol, callback) {
     let input = symbol ? { symbol: symbol } : {};
     return publicRequest(
       common,

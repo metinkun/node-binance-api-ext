@@ -1834,16 +1834,16 @@ module.exports = function (common) {
    * @param {boolean} singleCallback - avoid call one callback for each symbol in data array
    * @return {string} the websocket endpoint
    */
-  this.prevDay = function prevDay(symbols, callback, singleCallback) {
+  this.daily = function daily(symbols, callback, singleCallback) {
     let reconnect = () => {
-      if (common.options.reconnect) prevDay(symbols, callback);
+      if (common.options.reconnect) daily(symbols, callback);
     };
 
     let subscription;
     // Combine stream for array of symbols
     if (Array.isArray(symbols)) {
       if (!isArrayUnique(symbols))
-        throw Error('prevDay: "symbols" cannot contain duplicate elements.');
+        throw Error('daily: "symbols" cannot contain duplicate elements.');
       let streams = symbols.map(function (symbol) {
         return symbol.toLowerCase() + '@ticker';
       });
@@ -1989,7 +1989,7 @@ module.exports = function (common) {
   };
 
   /**
-   * Futures WebSocket prevDay ticker
+   * Futures WebSocket daily ticker
    * @param {symbol} symbol name or false. can also be a callback
    * @param {function} callback - callback function
    * @return {string} the websocket endpoint

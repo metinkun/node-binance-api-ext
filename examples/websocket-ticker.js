@@ -10,6 +10,6 @@ setInterval( () => {
 }, 1000 );
 
 // Get 24h price change statistics for all symbols
-binance.websockets.prevDay( false, function ( error, obj ) {
+binance.websockets.daily( false, function ( error, obj ) {
     global.ticker[obj.symbol] = obj;
 } );

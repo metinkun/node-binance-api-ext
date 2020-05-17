@@ -26,7 +26,6 @@ With full documented functions and intellisense support , it is easy to use
 
 \*🌟🌟🌟Request weight based rate limiting ( no more ip bans)
 
-
 --TODO
 
 \*Automatic syncronize timestamp if server throws timestamp error
@@ -55,7 +54,7 @@ With full documented functions and intellisense support , it is easy to use
 
 ```javascript
 const Binance = require('node-binance-api-ext');
-const binance = new Binance().options({
+const binance = Binance({
   APIKEY: '<key>',
   APISECRET: '<secret>',
 });
@@ -275,13 +274,13 @@ binance.webSocket.futuresBookTickerStream(console.log);
 binance.webSocket.futuresBookTickerStream('BTCUSDT', console.log);
 ```
 
-#### Futures prevDay ticker stream for all symbols
+#### Futures daily ticker stream for all symbols
 
 ```js
 binance.webSocket.futuresTickerStream(console.log);
 ```
 
-#### Futures prevDay ticker stream for a symbol
+#### Futures daily ticker stream for a symbol
 
 ```js
 binance.webSocket.futuresTickerStream('BTCUSDT', console.log);
@@ -1604,9 +1603,9 @@ binance.spot.dustLog((error, dustlog) => {
 #### Get 24hr ticker price change statistics for all symbols
 
 ```javascript
-binance.spot.prevDay(false, (error, prevDay) => {
-  // console.info(prevDay); // view all data
-  for (let obj of prevDay) {
+binance.spot.daily(false, (error, daily) => {
+  // console.info(daily); // view all data
+  for (let obj of daily) {
     let symbol = obj.symbol;
     console.info(
       symbol +
@@ -1623,11 +1622,9 @@ binance.spot.prevDay(false, (error, prevDay) => {
 #### Get 24hr ticker price change statistics for a symbol
 
 ```javascript
-binance.spot.prevDay('BNBBTC', (error, prevDay, symbol) => {
-  console.info(symbol + ' previous day:', prevDay);
-  console.info(
-    'BNB change since yesterday: ' + prevDay.priceChangePercent + '%'
-  );
+binance.spot.daily('BNBBTC', (error, daily, symbol) => {
+  console.info(symbol + ' previous day:', daily);
+  console.info('BNB change since yesterday: ' + daily.priceChangePercent + '%');
 });
 ```
 
@@ -1839,12 +1836,12 @@ binance.webSocket.miniTicker((markets) => {
 
 ```js
 // For all symbols:
-binance.webSocket.prevDay(false, (error, response) => {
+binance.webSocket.daily(false, (error, response) => {
   console.info(response);
 });
 
 // For a specific symbol:
-binance.webSocket.prevDay('BNBBTC', (error, response) => {
+binance.webSocket.daily('BNBBTC', (error, response) => {
   console.info(response);
 });
 ```
@@ -2188,7 +2185,7 @@ Verify that your system time is correct. If you have any suggestions don't hesit
 Having problems? Try adding `useServerTime` to your options or setting `recvWindow`:
 
 ```js
-binance.options({
+binance = Binance({
   APIKEY: 'xxx',
   APISECRET: 'xxx',
   useServerTime: true,

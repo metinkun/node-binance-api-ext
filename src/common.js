@@ -4,7 +4,7 @@ const qs = require('qs');
 const crypto = require('crypto');
 const axios = require('axios').default;
 const { RateLimitWeight } = require('rate-limit-ext');
-const send = new RateLimitWeight(axios, { weigthLimit: 100, period: 5000 });
+const limitter = new RateLimitWeight(axios, { weigthLimit: 100, period: 5000 });
 
 const default_options = {
   recvWindow: 5000,
@@ -259,7 +259,7 @@ const request = (reqObj, callBack, parser, weight = 1) => {
     rej = (err) => callBack(err);
     res = (response) => callBack(null, response);
   }
-  send.request(weight, reqObj)
+  limitter.request(weight, reqObj)
     .then((response) => {
       if (response.status !== 200) {
         let err = response.data;
