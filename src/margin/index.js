@@ -220,7 +220,11 @@ module.exports = function (common) {
       common.sapi + 'v1/margin/allOrders',
       parameters,
       callback,
-      tempKeys
+      tempKeys,
+      false,
+      false,
+      false,
+      5
     );
   };
 
@@ -264,7 +268,11 @@ module.exports = function (common) {
       common.sapi + 'v1/margin/openOrders',
       parameters,
       callback,
-      tempKeys
+      tempKeys,
+      false,
+      false,
+      false,
+      symbol ? 1 : 40
     );
   };
 
@@ -317,7 +325,11 @@ module.exports = function (common) {
           );
         }
       },
-      tempKeys
+      tempKeys,
+      false,
+      false,
+      false,
+      symbol ? 1 : 40
     );
   };
 
@@ -339,7 +351,9 @@ module.exports = function (common) {
       callback,
       tempKeys,
       false,
-      'POST'
+      'POST',
+      false,
+      5
     );
   };
 
@@ -360,7 +374,9 @@ module.exports = function (common) {
       callback,
       tempKeys,
       false,
-      'POST'
+      'POST',
+      false,
+      5
     );
   };
 
@@ -434,7 +450,11 @@ module.exports = function (common) {
       common.sapi + 'v1/margin/account',
       {},
       callback,
-      tempKeys
+      tempKeys,
+      false,
+      false,
+      false,
+      5
     );
   };
   /**

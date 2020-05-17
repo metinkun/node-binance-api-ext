@@ -2,7 +2,10 @@
 const file = require('fs');
 const qs = require('qs');
 const crypto = require('crypto');
-const requestAxios = require('axios').default.request;
+const axios = require('axios').default;
+const { RateLimitWeight } = require('rate-limit-ext');
+const send = new RateLimitWeight(axios, { weigthLimit: 100, period: 5000 })
+  .request;
 
 const default_options = {
   recvWindow: 5000,
@@ -126,8 +129,8 @@ const makeQueryString = (q) =>
     }, [])
     .join('&');
 
-const proxyRequest = (common, opt, cb, parser) =>
-  request(addProxy(common, opt), cb, parser);
+const proxyRequest = (common, opt, cb, parser, weight = 1) =>
+  request(addProxy(common, opt), cb, parser, weight);
 
 const reqObjPOST = (common, url, data = {}, key) => ({
   url: url,
@@ -173,11 +176,19 @@ const reqObj = (
  * @param {function} parser - The callback method to call
  * @return {?promise}
  */
-const apiRequest = (common, url, data = {}, callback, method, parser) => {
+const apiRequest = (
+  common,
+  url,
+  data = {},
+  callback,
+  method,
+  parser,
+  weight = 1
+) => {
   if (!method) method = 'GET';
   if (!common.options.APIKEY) throw Error('apiRequest: Invalid API Key');
   let opt = reqObj(common, url, data, method, common.options.APIKEY, true);
-  return proxyRequest(common, opt, callback, parser);
+  return proxyRequest(common, opt, callback, parser, weight);
 };
 
 /**
@@ -200,7 +211,8 @@ const signedRequest = (
   tempKeys,
   parser,
   method,
-  noDataInSignature = false
+  noDataInSignature = false,
+  weight = 1
 ) => {
   if (!method) method = 'GET';
   let apiKey, secretKey;
@@ -221,10 +233,6 @@ const signedRequest = (
     .createHmac('sha256', secretKey)
     .update(query)
     .digest('hex'); // set the HMAC hash header
-  // secret  "lmZSYEcDVOUJsbKYK2n5wjBTYi0h9hGvd3yU9XVj0jdy3R9wffDMQ1eX3YEPjhnR"
-  // query   "symbol=ETHBTC&side=BUY&type=LIMIT&quantity=1&price=0.069&timeInForce=GTC&timestamp=1589320601091&recvWindow=5000"
-
-  //"a82b8ca39dda567b9f88ec5a0ffd746fde079e4896363fb603320d3aeeaf6bfe"
   let opt;
   if (method === 'POST') {
     opt = reqObjPOST(common, url + '?signature=' + signature, data, apiKey);
@@ -238,10 +246,10 @@ const signedRequest = (
       !query
     );
   }
-  return proxyRequest(common, opt, callback, parser);
+  return proxyRequest(common, opt, callback, parser, weight);
 };
 
-const request = (reqObj, callBack, parser) => {
+const request = (reqObj, callBack, parser, weight = 1) => {
   let res, rej, promise;
   if (!callBack) {
     promise = new Promise((resolve, reject) => {
@@ -252,7 +260,7 @@ const request = (reqObj, callBack, parser) => {
     rej = (err) => callBack(err);
     res = (response) => callBack(null, response);
   }
-  requestAxios(reqObj)
+  send(weight, reqObj)
     .then((response) => {
       if (response.status !== 200) {
         let err = response.data;
@@ -288,7 +296,8 @@ const promiseRequest = async (
   data = {},
   flags = {},
   callback,
-  parser
+  parser,
+  weight = 1
 ) => {
   let query = '',
     headers = {
@@ -334,30 +343,14 @@ const promiseRequest = async (
       .digest('hex'); // HMAC hash header
     opt.url = `${baseURL}${url}?${query}&signature=${data.signature}`;
   } else opt.params = data;
-  return request(addProxy(common, opt), callback, parser);
+  return proxyRequest(common, opt, callback, parser, weight);
 };
 
-/**
- * Make market request
- * @param {object} common - common private object
- * @param {string} url - The http endpoint
- * @param {object} data - The data to send
- * @param {function} callback - The callback method to call
- * @param {string} method - the http method
- * @return {undefined}
- */
-const marketRequest = (common, url, data = {}, callback, method = 'GET') => {
-  if (!common.options.APIKEY) throw Error('apiRequest: Invalid API Key');
-  let query = makeQueryString(data);
-  let opt = reqObj(
-    common,
-    url + (query ? '?' + query : ''),
-    data,
-    method,
-    common.options.APIKEY,
-    false
-  );
-  return proxyRequest(common, opt, callback);
+const depthWeight = (limit) => {
+  if (limit < 50) return 2;
+  else if (limit < 100) return 5;
+  else if (limit < 500) return 10;
+  else return 20;
 };
 
 /**
@@ -368,9 +361,18 @@ const marketRequest = (common, url, data = {}, callback, method = 'GET') => {
  * @param {string} method - the http method
  * @return {undefined}
  */
-const publicRequest = (common, url, data = {}, callback, method = 'GET') => {
+const publicRequest = (
+  common,
+  url,
+  data = {},
+  callback,
+  method,
+  parser,
+  weight = 1
+) => {
+  if (!method) method = 'GET';
   let opt = reqObj(common, url, data, method, false, true);
-  return proxyRequest(common, opt, callback);
+  return proxyRequest(common, opt, callback, parser, weight);
 };
 
 /**
@@ -406,10 +408,10 @@ module.exports = {
   apiRequest,
   signedRequest,
   promiseRequest,
-  marketRequest,
   addProxy,
   reqObj,
   reqObjPOST,
   publicRequest,
   depthData,
+  depthWeight
 };

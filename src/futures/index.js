@@ -1,5 +1,5 @@
 /* eslint-disable space-in-parens */
-const { promiseRequest } = require('../common');
+const { promiseRequest, depthWeight } = require('../common');
 
 module.exports = function (common) {
   // Futures
@@ -123,7 +123,8 @@ module.exports = function (common) {
       symbol ? { symbol } : {},
       { base: common.fapi },
       callback,
-      parser
+      parser,
+      symbol ? 1 : 2
     );
   };
 
@@ -143,7 +144,8 @@ module.exports = function (common) {
       symbol ? { symbol } : {},
       { base: common.fapi },
       callback,
-      parser
+      parser,
+      symbol ? 1 : 40
     );
   };
 
@@ -421,7 +423,9 @@ module.exports = function (common) {
         base: common.fapi,
         type: 'SIGNED',
       },
-      callback
+      callback,
+      false,
+      30
     );
   };
   /**
@@ -440,7 +444,9 @@ module.exports = function (common) {
       'v1/positionSide/dual',
       params,
       { base: common.fapi, type: 'SIGNED', method: 'POST' },
-      callback
+      callback,
+      false,
+      30
     );
   };
 
@@ -509,7 +515,9 @@ module.exports = function (common) {
         base: common.fapi,
         type: 'SIGNED',
       },
-      callback
+      callback,
+      false,
+      5
     );
   };
 
@@ -523,12 +531,15 @@ module.exports = function (common) {
    */
   this.depth = async (symbol, params = {}, callback) => {
     params.symbol = symbol;
+
     return promiseRequest(
       common,
       'v1/depth',
       params,
       { base: common.fapi },
-      callback
+      callback,
+      false,
+      depthWeight(params.limit)
     );
   };
 
@@ -549,7 +560,8 @@ module.exports = function (common) {
         base: common.fapi,
       },
       callback,
-      parser
+      parser,
+      symbol ? 1 : 2
     );
   };
 
@@ -639,7 +651,9 @@ module.exports = function (common) {
         base: common.fapi,
         type: 'SIGNED',
       },
-      callback
+      callback,
+      false,
+      symbol ? 1 : 40
     );
   };
 
@@ -665,7 +679,9 @@ module.exports = function (common) {
         base: common.fapi,
         type: 'SIGNED',
       },
-      callback
+      callback,
+      false,
+      5
     );
   };
 
@@ -756,7 +772,9 @@ module.exports = function (common) {
         base: common.fapi,
         type: 'MARKET_DATA',
       },
-      callback
+      callback,
+      false,
+      5
     );
   };
 
@@ -807,7 +825,8 @@ module.exports = function (common) {
         base: common.fapi,
         type: 'SIGNED',
       },
-      callback
+      callback,
+      false
     );
   };
 
@@ -897,7 +916,9 @@ module.exports = function (common) {
       {
         base: common.fapi,
       },
-      callback
+      callback,
+      false,
+      5
     );
   };
 
@@ -918,7 +939,9 @@ module.exports = function (common) {
         base: common.fapi,
         type: 'SIGNED',
       },
-      callback
+      callback,
+      false,
+      5
     );
   };
 

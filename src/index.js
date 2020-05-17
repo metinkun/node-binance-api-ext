@@ -289,7 +289,7 @@ const main = function Main(common) {
       common.info.timeOffset = data.serverTime - Date.now();
       return data;
     };
-    return apiRequest(
+    return publicRequest(
       common,
       common.base + 'v3/time',
       {},

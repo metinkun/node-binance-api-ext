@@ -1,13 +1,11 @@
 /* eslint-disable space-in-parens */
 const {
-  request,
-  addProxy,
   signedRequest,
   publicRequest,
-  marketRequest,
   depthData,
   pullKeys,
   apiRequest,
+  depthWeight,
 } = require('../common');
 
 module.exports = function (common) {
@@ -144,20 +142,21 @@ module.exports = function (common) {
 
   /**
    * Gets the prices of a given symbol(s)
-   * @param {string} symbol - the symbol
+   * @param {string} symbol - symbol NOT MANDATORY
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.prices = function (symbol, callback = false) {
-    const params = typeof symbol === 'string' ? '?symbol=' + symbol : '';
-    if (typeof symbol === 'function') callback = symbol; // backwards compatibility
-
-    let opt = {
-      url: common.base + 'v3/ticker/price' + params,
-      timeout: common.options.recvWindow,
-    };
-
-    return request(addProxy(common, opt), callback, priceParser);
+    let params = symbol ? { symbol: symbol } : {};
+    return publicRequest(
+      common,
+      common.base + 'v3/ticker/price',
+      params,
+      callback,
+      false,
+      priceParser,
+      symbol ? 1 : 2
+    );
   };
 
   /**
@@ -173,7 +172,10 @@ module.exports = function (common) {
       params,
       callback,
       pullKeys(params),
-      balanceParser
+      balanceParser,
+      false,
+      false,
+      5
     );
   };
 
@@ -232,7 +234,11 @@ module.exports = function (common) {
       common.base + 'v3/openOrders',
       params,
       callback,
-      tempKeys
+      tempKeys,
+      false,
+      false,
+      false,
+      symbol ? 1 : 40
     );
   };
 
@@ -252,7 +258,9 @@ module.exports = function (common) {
       callback,
       pullKeys(params),
       false,
-      'DELETE'
+      'DELETE',
+      false,
+      symbol ? 1 : 40
     );
   };
 
@@ -295,7 +303,11 @@ module.exports = function (common) {
           );
         }
       },
-      tempKeys
+      tempKeys,
+      false,
+      false,
+      false,
+      symbol ? 1 : 40
     );
 
     if (!promise) promise = req;
@@ -317,7 +329,11 @@ module.exports = function (common) {
       common.base + 'v3/allOrders',
       params,
       callback,
-      pullKeys(params)
+      pullKeys(params),
+      false,
+      false,
+      false,
+      5
     );
   };
 
@@ -336,7 +352,8 @@ module.exports = function (common) {
       params,
       callback,
       pullKeys(params),
-      depthData
+      depthData,
+      depthWeight(params.limit)
     );
   };
 
@@ -425,17 +442,20 @@ module.exports = function (common) {
 
   /**
    * Gets the average prices of a given symbol
-   * @param {string} symbol - the symbol
+   * @param {string} symbol - symbol MANDATORY
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.avgPrice = function (symbol, callback = false) {
-    let opt = {
-      url: common.base + 'v3/avgPrice?symbol=' + symbol,
-      timeout: common.options.recvWindow,
-    };
     const parser = (data) => ({ [symbol]: data.price });
-    return request(addProxy(common, opt), callback, parser);
+    return publicRequest(
+      common,
+      common.base + 'v3/avgPrice',
+      { symbol },
+      callback,
+      false,
+      parser
+    );
   };
 
   /**
@@ -445,14 +465,17 @@ module.exports = function (common) {
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.bookTickers = function (symbol, callback) {
-    const params = typeof symbol === 'string' ? '?symbol=' + symbol : '';
-    if (typeof symbol === 'function') callback = symbol; // backwards compatibility
-    let opt = {
-      url: common.base + 'v3/ticker/bookTicker' + params,
-      timeout: common.options.recvWindow,
-    };
+    let input = symbol ? { symbol: symbol } : {};
     const parser = symbol ? null : bookPriceData;
-    return request(addProxy(common, opt), callback, parser);
+    return publicRequest(
+      common,
+      common.base + 'v3/ticker/bookTicker',
+      input,
+      callback,
+      false,
+      parser,
+      symbol ? 1 : 2
+    );
   };
 
   /**
@@ -467,7 +490,10 @@ module.exports = function (common) {
       common,
       common.base + 'v3/ticker/24hr',
       input,
-      callback
+      callback,
+      false,
+      false,
+      symbol ? 1 : 40
     );
   };
 
@@ -477,7 +503,7 @@ module.exports = function (common) {
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.time = function (callback) {
-    return apiRequest(common, common.base + 'v3/time', {}, callback);
+    return publicRequest(common, common.base + 'v3/time', {}, callback);
   };
 
   /**
@@ -501,7 +527,11 @@ module.exports = function (common) {
       common.base + 'v3/account',
       params,
       callback,
-      pullKeys(params)
+      pullKeys(params),
+      false,
+      false,
+      false,
+      5
     );
   };
 
@@ -520,7 +550,11 @@ module.exports = function (common) {
       common.base + 'v3/myTrades',
       params,
       callback,
-      pullKeys(params)
+      pullKeys(params),
+      false,
+      false,
+      false,
+      5
     );
   };
 
@@ -534,11 +568,14 @@ module.exports = function (common) {
   this.historicalTrades = function (symbol, params = {}, callback) {
     params.symbol = symbol;
 
-    return marketRequest(
+    return apiRequest(
       common,
       common.base + 'v3/historicalTrades',
       params,
-      callback
+      callback,
+      false,
+      false,
+      5
     );
   };
 
@@ -551,7 +588,7 @@ module.exports = function (common) {
    */
   this.recentTrades = function (symbol, params = {}, callback) {
     params.symbol = symbol;
-    return marketRequest(common, common.base + 'v1/trades', params, callback);
+    return publicRequest(common, common.base + 'v1/trades', params, callback);
   };
 
   /**
@@ -581,11 +618,6 @@ module.exports = function (common) {
    */
   this.aggTrades = function (symbol, params = {}, callback = false) {
     params.symbol = symbol;
-    return marketRequest(
-      common,
-      common.base + 'v3/aggTrades',
-      params,
-      callback
-    );
+    return apiRequest(common, common.base + 'v3/aggTrades', params, callback);
   };
 };
