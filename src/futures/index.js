@@ -12,7 +12,7 @@ module.exports = function (common) {
   const balanceParser = (data) => {
     let balances = {};
     if (typeof data === 'undefined') return {};
-    for (let obj of data.balances) {
+    for (let obj of data) {
       obj.withdrawAvailable = Number(obj.withdrawAvailable);
       const total = Number(obj.balance);
       if (total > 0)
