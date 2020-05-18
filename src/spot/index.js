@@ -132,10 +132,10 @@ module.exports = function (common) {
       return {};
     }
     for (let obj of data.balances) {
-      balances[obj.asset] = {
-        available: Number(obj.free),
-        total: Number(obj.free) + Number(obj.locked),
-      };
+      obj.free = Number(obj.free);
+      obj.locked = Number(obj.locked);
+      const total = obj.free + obj.locked;
+      if (total > 0) balances[obj.asset] = { available: obj.free, total };
     }
     return balances;
   };

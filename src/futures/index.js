@@ -17,10 +17,10 @@ module.exports = function (common) {
       return {};
     }
     for (let obj of data.balances) {
-      balances[obj.asset] = {
-        available: Number(obj.withdrawAvailable),
-        total: Number(obj.balance),
-      };
+      obj.withdrawAvailable = Number(obj.withdrawAvailable);
+      const total = Number(obj.balance);
+      if (total > 0)
+        balances[obj.asset] = { available: obj.withdrawAvailable, total };
     }
     return balances;
   };
