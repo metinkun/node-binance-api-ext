@@ -485,6 +485,9 @@ module.exports = function (common) {
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.daily = function (symbol, callback) {
+    const parser = (data) =>
+      symbol ? data : data.reduce((out, i) => ((out[i.symbol] = i), out), {});
+
     let input = symbol ? { symbol: symbol } : {};
     return publicRequest(
       common,
@@ -492,7 +495,7 @@ module.exports = function (common) {
       input,
       callback,
       false,
-      false,
+      parser,
       symbol ? 1 : 40
     );
   };
