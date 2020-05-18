@@ -12,10 +12,6 @@ module.exports = function (common) {
   const balanceParser = (data) => {
     let balances = {};
     if (typeof data === 'undefined') return {};
-    if (typeof data.balances === 'undefined') {
-      common.options.log('balanceData error', data);
-      return {};
-    }
     for (let obj of data.balances) {
       obj.withdrawAvailable = Number(obj.withdrawAvailable);
       const total = Number(obj.balance);
