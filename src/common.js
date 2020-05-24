@@ -259,7 +259,8 @@ const request = (reqObj, callBack, parser, weight = 1) => {
     rej = (err) => callBack(err);
     res = (response) => callBack(null, response);
   }
-  limitter.request(weight, reqObj)
+  limitter
+    .request(weight, reqObj)
     .then((response) => {
       if (response.status !== 200) {
         let err = response.data;
@@ -397,6 +398,23 @@ const depthData = (data) => {
   return { lastUpdateId: data.lastUpdateId, bids: bids, asks: asks };
 };
 
+/**
+ * Gets the price of a given symbol or symbols
+ * @param {array} data - array of symbols
+ * @return {array} - symbols with their current prices
+ */
+const priceParser = (data) => {
+  const prices = {};
+  if (Array.isArray(data)) {
+    for (let obj of data) {
+      prices[obj.symbol] = obj.price;
+    }
+  } else if (data.symbol) prices[data.symbol] = data.price;
+  else return data;
+
+  return prices;
+};
+
 module.exports = {
   createCommon,
   setOptions,
@@ -413,4 +431,5 @@ module.exports = {
   publicRequest,
   depthData,
   depthWeight,
+  priceParser,
 };

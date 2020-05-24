@@ -6,6 +6,7 @@ const {
   pullKeys,
   apiRequest,
   depthWeight,
+  priceParser,
 } = require('../common');
 
 module.exports = function (common) {
@@ -99,24 +100,6 @@ module.exports = function (common) {
       false,
       'POST'
     );
-  };
-
-  /**
-   * Gets the price of a given symbol or symbols
-   * @param {array} data - array of symbols
-   * @return {array} - symbols with their current prices
-   */
-  const priceParser = (data) => {
-    const prices = {};
-    if (Array.isArray(data)) {
-      for (let obj of data) {
-        prices[obj.symbol] = obj.price;
-      }
-    } else {
-      // Single price returned
-      prices[data.symbol] = data.price;
-    }
-    return prices;
   };
 
   /**

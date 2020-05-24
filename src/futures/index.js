@@ -1,5 +1,5 @@
 /* eslint-disable space-in-parens */
-const { promiseRequest, depthWeight } = require('../common');
+const { promiseRequest, depthWeight, priceParser } = require('../common');
 
 module.exports = function (common) {
   // Futures
@@ -111,15 +111,13 @@ module.exports = function (common) {
    * @return {promise or undefined} - omitting the callback returns a promise
    */
   this.prices = async (symbol, callback) => {
-    const parser = (data) =>
-      data.reduce((out, i) => ((out[i.symbol] = i.price), out), {});
     return await promiseRequest(
       common,
       'v1/ticker/price',
       symbol ? { symbol } : {},
       { base: common.fapi },
       callback,
-      parser,
+      priceParser,
       symbol ? 1 : 2
     );
   };
@@ -164,7 +162,7 @@ module.exports = function (common) {
   /**
    * limit buy
    * @param {string} symbol - symbol
-   * @param {string} quantity - The quantity to buy or sell
+   * @param {number} quantity - The quantity to buy or sell
    * @param {string} price - The price per unit to transact each unit at
    * @param {object} params -parameters
    * @param {string} params.APIKEY -apikey

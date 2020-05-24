@@ -499,3 +499,6 @@ function Binance(options = {}) {
 }
 module.exports = Binance;
 //https://github.com/binance-exchange/binance-official-api-docs
+
+
+//error codes : https://github.com/binance-exchange/binance-official-api-docs/blob/master/errors.md
