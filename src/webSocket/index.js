@@ -16,6 +16,8 @@ const {
   depthData,
 } = require('../common');
 
+const { times } = require('../constants');
+
 module.exports = function (common) {
   // websocket
 
@@ -236,11 +238,13 @@ module.exports = function (common) {
         common.options.log('Account data WebSocket reconnecting...');
       else
         common.options.log('WebSocket reconnecting: ' + this.endpoint + '...');
-      try {
-        reconnect();
-      } catch (error) {
-        common.options.log('WebSocket reconnect error: ' + error.message);
-      }
+      setTimeout(() => {
+        try {
+          reconnect();
+        } catch (error) {
+          common.options.log('WebSocket reconnect error: ' + error.message);
+        }
+      }, 10000);
     }
   };
 
@@ -516,13 +520,15 @@ module.exports = function (common) {
         common.options.log(
           'Futures WebSocket reconnecting: ' + this.endpoint + '...'
         );
-      try {
-        reconnect();
-      } catch (error) {
-        common.options.log(
-          'Futures WebSocket reconnect error: ' + error.message
-        );
-      }
+      setTimeout(() => {
+        try {
+          reconnect();
+        } catch (error) {
+          common.options.log(
+            'Futures WebSocket reconnect error: ' + error.message
+          );
+        }
+      }, 10000);
     }
   };
 
@@ -552,7 +558,7 @@ module.exports = function (common) {
       if (ws.isAlive) {
         ws.isAlive = false;
         if (ws.readyState === WebSocket.OPEN) ws.ping(noop);
-      } else {
+      } else if (!common.options.forcedReconnect) {
         if (common.options.verbose)
           common.options.log(
             `Terminating zombie futures WebSocket: ${ws.endpoint}`
@@ -651,24 +657,101 @@ module.exports = function (common) {
   /**
    * Combines all futures OHLC data with the latest update
    * @param {string} symbol - the symbol
-   * @param {string} interval - time interval
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function
    * @return {array} - interval data for given symbol
    */
   const futuresKlineConcat = (symbol, interval) => {
-    let output = common.futuresTicks[symbol][interval];
-    if (typeof common.futuresRealtime[symbol][interval].time === 'undefined')
-      return output;
-    const time = common.futuresRealtime[symbol][interval].time;
-    const last_updated = Object.keys(
-      common.futuresTicks[symbol][interval]
-    ).pop();
-    if (time >= last_updated) {
-      output[time] = common.futuresRealtime[symbol][interval];
-      //delete output[time].time;
-      output[last_updated].isFinal = true;
-      output[time].isFinal = false;
+    let last_updated,
+      output = common.futuresTicks[symbol][interval];
+    const realTime = common.futuresRealtime[symbol][interval];
+    const { time } = realTime;
+
+    if (typeof time === 'undefined') return output;
+
+    if (common.options.arrayBased) {
+      last_updated = output[output.length - 1];
+      if (time === last_updated[0]) {
+        const { open, high, low, close, volume, closeTime } = realTime;
+        output[time] = [
+          time,
+          parseFloat(open),
+          parseFloat(high),
+          parseFloat(low),
+          parseFloat(close),
+          parseFloat(volume),
+          closeTime,
+          0, // isFinal
+        ];
+
+        last_updated[7] = 0;
+      }
+    } else {
+      last_updated = Object.keys(common.futuresTicks[symbol][interval]).pop();
+      if (time >= last_updated) {
+        output[time] = realTime;
+        output[last_updated].isFinal = true;
+        output[time].isFinal = false;
+      }
     }
+
     return output;
+  };
+
+  const getFuturesKlineSnapshot = async (symbol, interval, callback, limit) => {
+    common.options.log('getFuturesKlineSnapshot');
+    common.futuresMeta[symbol][interval].timestamp = 0;
+    let data = await promiseRequest(
+      common,
+      'v1/klines',
+      { symbol, interval, limit },
+      { base: common.fapi }
+    );
+    common.futuresTicks[symbol][interval].length = 0;
+    futuresKlineData(symbol, interval, data);
+    //common.options.log('/futures klines at ' + common.futuresMeta[symbol][interval].timestamp);
+    if (typeof common.futuresKlineQueue[symbol][interval] !== 'undefined') {
+      const len = common.futuresKlineQueue[symbol][interval].length;
+      for (let i = 0; i < len; i++) {
+        const kline = common.futuresKlineQueue[symbol][interval][i];
+        futuresKlineHandler(
+          symbol,
+          kline,
+          common.futuresMeta[symbol][interval].timestamp
+        );
+      }
+      delete common.futuresKlineQueue[symbol][interval];
+    }
+    if (callback)
+      callback(symbol, interval, common.futuresTicks[symbol][interval]);
+    // callback(symbol, interval, futuresKlineConcat(symbol, interval));
+  };
+
+  let getSymbolKlineSnapshot = (symbol, interval, callback, limit) => {
+    common.options.log('getSpotKlineSnapshot');
+    common.info[symbol][interval].timestamp = 0;
+    publicRequest(
+      common,
+      common.base + 'v3/klines',
+      { symbol, interval, limit },
+      function (error, data) {
+        common.ohlc[symbol][interval].length = 0;
+        klineData(symbol, interval, data);
+        //common.options.log('/klines at ' + common.info[symbol][interval].timestamp);
+        if (typeof common.klineQueue[symbol][interval] !== 'undefined') {
+          const len = common.klineQueue[symbol][interval].length;
+          for (let i = 0; i < len; i++) {
+            const kline = common.klineQueue[symbol][interval][i];
+            klineHandler(
+              symbol,
+              kline,
+              common.info[symbol][interval].timestamp
+            );
+          }
+          delete common.klineQueue[symbol][interval];
+        }
+        if (callback) callback(symbol, interval, common.ohlc[symbol][interval]);
+      }
+    );
   };
 
   /**
@@ -682,6 +765,8 @@ module.exports = function (common) {
     // eslint-disable-next-line no-unused-vars
     let { e: eventType, E: eventTime, k: ticks } = kline;
     // eslint-disable-next-line no-unused-vars
+    const { arrayBased } = common.options;
+
     let {
       o: open,
       h: high,
@@ -697,12 +782,49 @@ module.exports = function (common) {
       t: time,
       T: closeTime,
     } = ticks;
+    const myTicks = common.futuresTicks[symbol][interval];
+    const lastTime = common.futuresMeta[symbol][interval].timestamp;
+    const myLastTick =
+      myTicks && (arrayBased ? myTicks[myTicks.length - 1] : myTicks[lastTime]);
+
     if (time <= firstTime) return;
-    if (!isFinal) {
-      // if ( typeof common.futuresRealtime[symbol][interval].time !== 'undefined' ) {
-      //     if ( common.futuresRealtime[symbol][interval].time > time ) return;
-      // }
-      common.futuresRealtime[symbol][interval] = {
+    if (lastTime > time) return;
+
+    common.futuresRealtime[symbol][interval] = {
+      time,
+      closeTime,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      quoteVolume,
+      takerBuyBaseVolume,
+      takerBuyQuoteVolume,
+      trades,
+      isFinal,
+    };
+
+    if (arrayBased) {
+      const newTick = [
+        time,
+        parseFloat(open),
+        parseFloat(high),
+        parseFloat(low),
+        parseFloat(close),
+        parseFloat(volume),
+        closeTime,
+        isFinal ? 1 : 0,
+      ];
+      if (lastTime === time) {
+        myTicks[myTicks.length - 1] = newTick;
+      } else {
+        myTicks.shift();
+        myTicks.push(newTick);
+        if (!myLastTick[7]) return true;
+      }
+    } else {
+      myTicks[time] = {
         time,
         closeTime,
         open,
@@ -716,27 +838,16 @@ module.exports = function (common) {
         trades,
         isFinal,
       };
-      return;
+      if (time > lastTime) {
+        const first_updated = Object.keys(myTicks).shift();
+        if (first_updated) delete myTicks[first_updated];
+        if (!myLastTick.isFinal) return true;
+      }
     }
-    const first_updated = Object.keys(
-      common.futuresTicks[symbol][interval]
-    ).shift();
-    if (first_updated)
-      delete common.futuresTicks[symbol][interval][first_updated];
-    common.futuresTicks[symbol][interval][time] = {
-      time,
-      closeTime,
-      open,
-      high,
-      low,
-      close,
-      volume,
-      quoteVolume,
-      takerBuyBaseVolume,
-      takerBuyQuoteVolume,
-      trades,
-      isFinal: false,
-    };
+
+    if (time - lastTime > times[interval].ms) return true;
+    // needed snapshot again
+    else common.futuresMeta[symbol][interval].timestamp = time;
   };
 
   /**
@@ -985,58 +1096,77 @@ module.exports = function (common) {
   /**
    * Used by web sockets depth and populates OHLC and info
    * @param {string} symbol - symbol to get candlestick info
-   * @param {string} interval - time interval, 1m, 3m, 5m ....
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function, 1m, 3m, 5m ....
    * @param {array} ticks - tick array
    * @return {undefined}
    */
   const klineData = (symbol, interval, ticks) => {
-    // Used for /depth
-    let last_time = 0;
     if (isIterable(ticks)) {
-      for (let tick of ticks) {
-        // eslint-disable-next-line no-unused-vars
-        let [
-          time,
-          open,
-          high,
-          low,
-          close,
-          volume,
-          closeTime,
-          assetVolume,
-          trades,
-          buyBaseVolume,
-          buyAssetVolume,
-          ignored,
-        ] = tick;
-        common.ohlc[symbol][interval][time] = {
-          open: open,
-          high: high,
-          low: low,
-          close: close,
-          volume: volume,
-        };
-        last_time = time;
+      const len = ticks.length;
+      for (let i = 0; i < len; i++) {
+        const tick = ticks[i];
+        if (common.options.arrayBased) {
+          common.ohlc[symbol][interval].push([
+            tick[0],
+            parseFloat(tick[1]),
+            parseFloat(tick[2]),
+            parseFloat(tick[3]),
+            parseFloat(tick[4]),
+            parseFloat(tick[5]),
+            tick[6],
+            1,
+          ]);
+        } else {
+          // eslint-disable-next-line no-unused-vars
+          let [
+            time,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            closeTime,
+            assetVolume,
+            trades,
+            buyBaseVolume,
+            buyAssetVolume,
+            ignored,
+          ] = tick;
+          common.ohlc[symbol][interval][time] = {
+            time,
+            closeTime,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            assetVolume,
+            buyBaseVolume,
+            buyAssetVolume,
+            trades,
+            isFinal: 1,
+          };
+        }
       }
 
-      common.info[symbol][interval].timestamp = last_time;
+      common.info[symbol][interval].timestamp = ticks[len - 1][0];
     }
   };
 
   /**
    * Combines all OHLC data with latest update
    * @param {string} symbol - the symbol
-   * @param {string} interval - time interval, 1m, 3m, 5m ....
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function, 1m, 3m, 5m ....
    * @return {array} - interval data for given symbol
    */
   const klineConcat = (symbol, interval) => {
     let output = common.ohlc[symbol][interval];
-    if (typeof common.ohlcLatest[symbol][interval].time === 'undefined')
-      return output;
-    const time = common.ohlcLatest[symbol][interval].time;
+    const latest = common.ohlcLatest[symbol][interval];
+    const time = common.options.arrayBased ? latest[0] : latest.time;
+    if (typeof time === 'undefined') return output;
     const last_updated = Object.keys(common.ohlc[symbol][interval]).pop();
     if (time >= last_updated) {
-      output[time] = common.ohlcLatest[symbol][interval];
+      output[time] = latest;
       delete output[time].time;
       output[time].isFinal = false;
     }
@@ -1055,6 +1185,8 @@ module.exports = function (common) {
     // eslint-disable-next-line no-unused-vars
     let { e: eventType, E: eventTime, k: ticks } = kline;
     // eslint-disable-next-line no-unused-vars
+    const { arrayBased } = common.options;
+
     let {
       o: open,
       h: high,
@@ -1063,78 +1195,137 @@ module.exports = function (common) {
       v: volume,
       i: interval,
       x: isFinal,
-      q: quoteVolume,
+      q: assetVolume,
+      V: buyBaseVolume,
+      Q: buyAssetVolume,
+      n: trades,
       t: time,
+      T: closeTime,
     } = ticks; //n:trades, V:buyVolume, Q:quoteBuyVolume
+    const myTicks = common.ohlc[symbol][interval];
+    const lastTime = common.info[symbol][interval].timestamp;
+    const myLastTick =
+      myTicks && (arrayBased ? myTicks[myTicks.length - 1] : myTicks[lastTime]);
     if (time <= firstTime) return;
-    if (!isFinal) {
-      if (typeof common.ohlcLatest[symbol][interval].time !== 'undefined') {
-        if (common.ohlcLatest[symbol][interval].time > time) return;
-      }
-      common.ohlcLatest[symbol][interval] = {
-        open: open,
-        high: high,
-        low: low,
-        close: close,
-        volume: volume,
-        time: time,
-      };
-      return;
-    }
-    // Delete an element from the beginning so we don't run out of memory
-    const first_updated = Object.keys(common.ohlc[symbol][interval]).shift();
-    if (first_updated) delete common.ohlc[symbol][interval][first_updated];
-    common.ohlc[symbol][interval][time] = {
-      open: open,
-      high: high,
-      low: low,
-      close: close,
-      volume: volume,
+    if (lastTime > time) return;
+
+    common.ohlcLatest[symbol][interval] = {
+      time,
+      closeTime,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      assetVolume,
+      buyBaseVolume,
+      buyAssetVolume,
+      trades,
+      isFinal,
     };
+
+    if (arrayBased) {
+      const newTick = [
+        time,
+        parseFloat(open),
+        parseFloat(high),
+        parseFloat(low),
+        parseFloat(close),
+        parseFloat(volume),
+        closeTime,
+        isFinal ? 1 : 0,
+      ];
+      if (lastTime === time) {
+        myTicks[myTicks.length - 1] = newTick;
+      } else {
+        myTicks.shift();
+        myTicks.push(newTick);
+        if (!myLastTick[7]) return true;
+      }
+    } else {
+      myTicks[time] = {
+        time,
+        closeTime,
+        open,
+        high,
+        low,
+        close,
+        volume,
+        assetVolume,
+        buyBaseVolume,
+        buyAssetVolume,
+        trades,
+        isFinal,
+      };
+      if (time > lastTime) {
+        const first_updated = Object.keys(myTicks).shift();
+        if (first_updated) delete myTicks[first_updated];
+        if (!myLastTick.isFinal) return true;
+      }
+    }
+
+    if (time - lastTime > times[interval].ms) return true;
+    // needed snapshot again
+    else common.info[symbol][interval].timestamp = time;
   };
 
   /**
    * Used by futures websockets chart cache
    * @param {string} symbol - symbol to get candlestick info
-   * @param {string} interval - time interval, 1m, 3m, 5m ....
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function, 1m, 3m, 5m ....
    * @param {array} ticks - tick array
    * @return {undefined}
    */
   const futuresKlineData = (symbol, interval, ticks) => {
-    let last_time = 0;
     if (isIterable(ticks)) {
-      for (let tick of ticks) {
-        // eslint-disable-next-line no-unused-vars
-        let [
-          time,
-          open,
-          high,
-          low,
-          close,
-          volume,
-          closeTime,
-          quoteVolume,
-          trades,
-          takerBuyBaseVolume,
-          takerBuyQuoteVolume,
-          ignored,
-        ] = tick;
-        common.futuresTicks[symbol][interval][time] = {
-          time,
-          closeTime,
-          open,
-          high,
-          low,
-          close,
-          volume,
-          quoteVolume,
-          takerBuyBaseVolume,
-          takerBuyQuoteVolume,
-          trades,
-        };
-        last_time = time;
+      const len = ticks.length;
+      for (let i = 0; i < len; i++) {
+        const tick = ticks[i];
+
+        if (common.options.arrayBased) {
+          // common.futuresTicks[symbol][interval][tick[0]] = [
+          common.futuresTicks[symbol][interval].push([
+            tick[0],
+            parseFloat(tick[1]),
+            parseFloat(tick[2]),
+            parseFloat(tick[3]),
+            parseFloat(tick[4]),
+            parseFloat(tick[5]),
+            tick[6],
+            1,
+          ]);
+        } else {
+          let [
+            time,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            closeTime,
+            quoteVolume,
+            trades,
+            takerBuyBaseVolume,
+            takerBuyQuoteVolume,
+            ignored,
+          ] = tick;
+          common.futuresTicks[symbol][interval][time] = {
+            time,
+            closeTime,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            quoteVolume,
+            takerBuyBaseVolume,
+            takerBuyQuoteVolume,
+            trades,
+            isFinal: 1,
+          };
+        }
       }
-      common.futuresMeta[symbol][interval].timestamp = last_time;
+      common.futuresMeta[symbol][interval].timestamp = ticks[len - 1][0];
     }
   };
 
@@ -1366,7 +1557,7 @@ module.exports = function (common) {
    * Websocket depth chart
    * @param {array/string} symbols - an array or string of symbols to query
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.depth = function depth(symbols, callback) {
     let reconnect = () => {
@@ -1388,7 +1579,7 @@ module.exports = function (common) {
         reconnect
       );
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
@@ -1396,7 +1587,7 @@ module.exports = function (common) {
    * @param {array/string} symbols - an array or string of symbols to query
    * @param {function} callback - callback function
    * @param {int} limit - the number of entries
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.depthCache = function depthCacheFunction(
     symbols,
@@ -1532,7 +1723,7 @@ module.exports = function (common) {
       );
       assignEndpointIdToContext(symbol, subscription.endpoint);
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
@@ -1580,7 +1771,7 @@ module.exports = function (common) {
    * Websocket aggregated trades
    * @param {array/string} symbols - an array or string of symbols to query
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.aggTrades = function trades(symbols, callback) {
     let reconnect = () => {
@@ -1602,14 +1793,14 @@ module.exports = function (common) {
         reconnect
       );
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Websocket raw trades
    * @param {array/string} symbols - an array or string of symbols to query
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.trades = function trades(symbols, callback) {
     let reconnect = () => {
@@ -1632,16 +1823,16 @@ module.exports = function (common) {
         reconnect
       );
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Websocket klines
    * @param {array/string} symbols - an array or string of symbols to query
-   * @param {string} interval - the time interval
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function
    * @param {function} callback - callback function
    * @param {int} limit - maximum results, no more than 1000
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.chart = function chart(symbols, interval, callback, limit = 500) {
     let reconnect = () => {
@@ -1653,8 +1844,10 @@ module.exports = function (common) {
       if (typeof common.info[symbol][interval] === 'undefined')
         common.info[symbol][interval] = {};
       if (typeof common.ohlc[symbol] === 'undefined') common.ohlc[symbol] = {};
-      if (typeof common.ohlc[symbol][interval] === 'undefined')
-        common.ohlc[symbol][interval] = {};
+      if (typeof common.ohlc[symbol][interval] === 'undefined') {
+        if (common.options.arrayBased) common.ohlc[symbol][interval] = [];
+        else common.ohlc[symbol][interval] = {};
+      }
       if (typeof common.ohlcLatest[symbol] === 'undefined')
         common.ohlcLatest[symbol] = {};
       if (typeof common.ohlcLatest[symbol][interval] === 'undefined')
@@ -1677,32 +1870,10 @@ module.exports = function (common) {
         }
       } else {
         //common.options.log('@klines at ' + kline.k.t);
-        klineHandler(symbol, kline);
-        if (callback) callback(symbol, interval, klineConcat(symbol, interval));
+        if (klineHandler(symbol, kline))
+          getSymbolKlineSnapshot(symbol, interval, callback, limit);
+        if (callback) callback(symbol, interval, common.ohlc[symbol][interval]);
       }
-    };
-
-    let getSymbolKlineSnapshot = (symbol, limit = 500) => {
-      publicRequest(
-        common,
-        common.base + 'v3/klines',
-        { symbol: symbol, interval: interval, limit: limit },
-        function (error, data) {
-          klineData(symbol, interval, data);
-          //common.options.log('/klines at ' + common.info[symbol][interval].timestamp);
-          if (typeof common.klineQueue[symbol][interval] !== 'undefined') {
-            for (let kline of common.klineQueue[symbol][interval])
-              klineHandler(
-                symbol,
-                kline,
-                common.info[symbol][interval].timestamp
-              );
-            delete common.klineQueue[symbol][interval];
-          }
-          if (callback)
-            callback(symbol, interval, klineConcat(symbol, interval));
-        }
-      );
     };
 
     let subscription;
@@ -1718,7 +1889,9 @@ module.exports = function (common) {
         handleKlineStreamData,
         reconnect
       );
-      symbols.forEach((element) => getSymbolKlineSnapshot(element, limit));
+      symbols.forEach((element) =>
+        getSymbolKlineSnapshot(element, interval, callback, limit)
+      );
     } else {
       let symbol = symbols;
       symbolChartInit(symbol);
@@ -1727,17 +1900,17 @@ module.exports = function (common) {
         handleKlineStreamData,
         reconnect
       );
-      getSymbolKlineSnapshot(symbol, limit);
+      getSymbolKlineSnapshot(symbol, interval, callback, limit);
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Websocket candle sticks
    * @param {array/string} symbols - an array or string of symbols to query
-   * @param {string} interval - the time interval
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.candlesticks = function candlesticks(symbols, interval, callback) {
     let reconnect = () => {
@@ -1765,13 +1938,13 @@ module.exports = function (common) {
         reconnect
       );
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Websocket mini ticker
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.miniTicker = function miniTicker(callback) {
     let reconnect = () => {
@@ -1796,14 +1969,14 @@ module.exports = function (common) {
       },
       reconnect
     );
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Spot WebSocket bookTicker (bid/ask quotes including price & amount)
    * @param {symbol} symbol name or false. can also be a callback
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.bookTickers = function bookTickerStream(
     symbol = false,
@@ -1824,7 +1997,7 @@ module.exports = function (common) {
       (data) => callback(fBookTickerConvertData(data)),
       reconnect
     );
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
@@ -1832,7 +2005,7 @@ module.exports = function (common) {
    * @param {array/string} symbols - an array or string of symbols to query
    * @param {function} callback - callback function
    * @param {boolean} singleCallback - avoid call one callback for each symbol in data array
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.daily = function daily(symbols, callback, singleCallback) {
     let reconnect = () => {
@@ -1880,7 +2053,7 @@ module.exports = function (common) {
         reconnect
       );
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
@@ -1929,7 +2102,7 @@ module.exports = function (common) {
    * Futures WebSocket aggregated trades
    * @param {array/string} symbols - an array or string of symbols to query
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresAggTradeStream = function futuresAggTradeStream(
     symbols,
@@ -1955,7 +2128,7 @@ module.exports = function (common) {
         { reconnect }
       );
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
@@ -1963,7 +2136,7 @@ module.exports = function (common) {
    * @param {symbol} symbol name or false. can also be a callback
    * @param {function} callback - callback function
    * @param {string} speed - 1 second updates. leave blank for default 3 seconds
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresMarkPriceStream = function fMarkPriceStream(
     symbol = false,
@@ -1985,14 +2158,14 @@ module.exports = function (common) {
       (data) => callback(fMarkPriceConvertData(data)),
       { reconnect }
     );
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Futures WebSocket daily ticker
    * @param {symbol} symbol name or false. can also be a callback
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresTickerStream = function fTickerStream(
     symbol = false,
@@ -2011,14 +2184,14 @@ module.exports = function (common) {
       (data) => callback(fTickerConvertData(data)),
       { reconnect }
     );
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Futures WebSocket miniTicker
    * @param {symbol} symbol name or false. can also be a callback
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresMiniTickerStream = function fMiniTickerStream(
     symbol = false,
@@ -2039,14 +2212,14 @@ module.exports = function (common) {
       (data) => callback(fMiniTickerConvertData(data)),
       { reconnect }
     );
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Futures WebSocket bookTicker
    * @param {symbol} symbol name or false. can also be a callback
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresBookTickerStream = function fBookTickerStream(
     symbol = false,
@@ -2067,16 +2240,16 @@ module.exports = function (common) {
       (data) => callback(fBookTickerConvertData(data)),
       { reconnect }
     );
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Websocket futures klines
    * @param {array/string} symbols - an array or string of symbols to query
-   * @param {string} interval - the time interval
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function
    * @param {function} callback - callback function
    * @param {int} limit - maximum results, no more than 1000
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresChart = async function futuresChart(
     symbols,
@@ -2084,7 +2257,7 @@ module.exports = function (common) {
     callback,
     limit = 500
   ) {
-    let reconnect = () => {
+    const reconnect = () => {
       if (common.options.reconnect)
         futuresChart(symbols, interval, callback, limit);
     };
@@ -2096,8 +2269,11 @@ module.exports = function (common) {
         common.futuresMeta[symbol][interval] = {};
       if (typeof common.futuresTicks[symbol] === 'undefined')
         common.futuresTicks[symbol] = {};
-      if (typeof common.futuresTicks[symbol][interval] === 'undefined')
-        common.futuresTicks[symbol][interval] = {};
+      if (typeof common.futuresTicks[symbol][interval] === 'undefined') {
+        if (common.options.arrayBased)
+          common.futuresTicks[symbol][interval] = [];
+        else common.futuresTicks[symbol][interval] = {};
+      }
       if (typeof common.futuresRealtime[symbol] === 'undefined')
         common.futuresRealtime[symbol] = {};
       if (typeof common.futuresRealtime[symbol][interval] === 'undefined')
@@ -2120,32 +2296,12 @@ module.exports = function (common) {
         }
       } else {
         //common.options.log('futures klines at ' + kline.k.t);
-        futuresKlineHandler(symbol, kline);
+        if (futuresKlineHandler(symbol, kline))
+          getFuturesKlineSnapshot(symbol, interval, callback, limit);
         if (callback)
-          callback(symbol, interval, futuresKlineConcat(symbol, interval));
+          callback(symbol, interval, common.futuresTicks[symbol][interval]);
+        // callback(symbol, interval, futuresKlineConcat(symbol, interval));
       }
-    };
-
-    let getFuturesKlineSnapshot = async (symbol, limit = 500) => {
-      let data = await promiseRequest(
-        common,
-        'v1/klines',
-        { symbol, interval, limit },
-        { base: common.fapi }
-      );
-      futuresKlineData(symbol, interval, data);
-      //common.options.log('/futures klines at ' + common.futuresMeta[symbol][interval].timestamp);
-      if (typeof common.futuresKlineQueue[symbol][interval] !== 'undefined') {
-        for (let kline of common.futuresKlineQueue[symbol][interval])
-          futuresKlineHandler(
-            symbol,
-            kline,
-            common.futuresMeta[symbol][interval].timestamp
-          );
-        delete common.futuresKlineQueue[symbol][interval];
-      }
-      if (callback)
-        callback(symbol, interval, futuresKlineConcat(symbol, interval));
     };
 
     let subscription;
@@ -2163,26 +2319,28 @@ module.exports = function (common) {
         handleFuturesKlineStream,
         reconnect
       );
-      symbols.forEach((element) => getFuturesKlineSnapshot(element, limit));
+      symbols.forEach((element) =>
+        getFuturesKlineSnapshot(element, interval, callback, limit)
+      );
     } else {
       let symbol = symbols;
       futuresChartInit(symbol);
       subscription = futuresSubscribeSingle(
         symbol.toLowerCase() + '@kline_' + interval,
         handleFuturesKlineStream,
-        reconnect
+        { reconnect }
       );
-      getFuturesKlineSnapshot(symbol, limit);
+      getFuturesKlineSnapshot(symbol, interval, callback, limit);
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Websocket futures candlesticks
    * @param {array/string} symbols - an array or string of symbols to query
-   * @param {string} interval - the time interval
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresCandlesticks = function futuresCandlesticks(
     symbols,
@@ -2215,14 +2373,14 @@ module.exports = function (common) {
         }
       );
     }
-    return subscription.endpoint;
+    return subscription;
   };
 
   /**
    * Futures WebSocket liquidations stream
    * @param {symbol} symbol name or false. can also be a callback
    * @param {function} callback - callback function
-   * @return {string} the websocket endpoint
+   * @return {string} the websocket
    */
   this.futuresLiquidationStream = function fLiquidationStream(
     symbol = false,
@@ -2243,6 +2401,6 @@ module.exports = function (common) {
       (data) => callback(fLiquidationConvertData(data)),
       { reconnect }
     );
-    return subscription.endpoint;
+    return subscription;
   };
 };

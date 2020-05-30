@@ -682,7 +682,7 @@ module.exports = function (common) {
   /**
    * get klines of given symbol
    * @param {string} symbol -symbol MANDATORY
-   * @param {string} interval -interval MANDATORY
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function
    * @param {object} params -parameters
    * @param {string} params.APIKEY -apikey
    * @param {string} params.APISECRET -secretkey
@@ -1036,4 +1036,6 @@ module.exports = function (common) {
       callback
     );
   };
+
+  this.chartData = common.futuresTicks;
 };

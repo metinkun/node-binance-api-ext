@@ -4,14 +4,16 @@ const qs = require('qs');
 const crypto = require('crypto');
 const axios = require('axios').default;
 const { RateLimitWeight } = require('rate-limit-ext');
-const limitter = new RateLimitWeight(axios, { weightLimit: 100, period: 5000 });
+const limiter = new RateLimitWeight(axios, { weightLimit: 100, period: 5000 });
 
 const default_options = {
   recvWindow: 5000,
   useServerTime: false,
   reconnect: true,
+  forcedReconnect : false, // keep trying reconnect whatever happens
   verbose: false,
   test: false,
+  arrayBased:false,
   log: function (...args) {
     console.log(Array.prototype.slice.call(args));
   },
@@ -34,6 +36,7 @@ function createCommon() {
     options: { ...default_options },
     info: { timeOffset: 0 },
     socketHeartbeatInterval: null,
+
 
     base: 'https://api.binance.com/api/',
     wapi: 'https://api.binance.com/wapi/',
@@ -259,7 +262,7 @@ const request = (reqObj, callBack, parser, weight = 1) => {
     rej = (err) => callBack(err);
     res = (response) => callBack(null, response);
   }
-  limitter
+  limiter
     .request(weight, reqObj)
     .then((response) => {
       if (response.status !== 200) {

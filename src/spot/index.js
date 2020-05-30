@@ -580,8 +580,8 @@ module.exports = function (common) {
   /**
    * Gets the candles information for a given symbol
    * intervals: 1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M
-   * @param {string} symbol - the symbol
-   * @param {function} interval - the callback function
+   * @param {string} symbol -symbol MANDATORY
+   * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function
    * @param {{startTime: number, endTime: number, limit: number}} params  - additional params
    * @param {function} callback - the callback function
    * @return {promise or undefined} - omitting the callback returns a promise
@@ -606,4 +606,6 @@ module.exports = function (common) {
     params.symbol = symbol;
     return apiRequest(common, common.base + 'v3/aggTrades', params, callback);
   };
+
+  this.chartData = common.ohlc;
 };

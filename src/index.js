@@ -493,12 +493,12 @@ function Binance(options = {}) {
     wapi: new wapi(common),
     margin: new margin(common),
     webSocket: new webSocket(common),
+    common,
   };
 
   return returnThis;
 }
 module.exports = Binance;
 //https://github.com/binance-exchange/binance-official-api-docs
-
 
 //error codes : https://github.com/binance-exchange/binance-official-api-docs/blob/master/errors.md
