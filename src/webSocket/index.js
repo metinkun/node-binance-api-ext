@@ -1552,7 +1552,7 @@ module.exports = function (common) {
     };
     apiRequest(
       common,
-      common.sapi + 'v1/listenKey',
+      common.fapi + 'v1/listenKey',
       {},
       function (error, response) {
         common.options.listenFuturesKey = response.listenKey;
