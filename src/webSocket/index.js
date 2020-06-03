@@ -1094,6 +1094,26 @@ module.exports = function (common) {
   };
 
   /**
+   * Used as part of the user data websockets callback
+   * @param {object} data - user data callback data type
+   * @return {undefined}
+   */
+  const userFuturesDataHandler = (data) => {
+    let type = data.e;
+    if (type === 'ACCOUNT_UPDATE') {
+      common.options.futures_account_callback(data);
+    } else if (type === 'ORDER_TRADE_UPDATE') {
+      if (common.options.futures_order_trade_callback)
+        common.options.futures_order_trade_callback(data);
+    } else if (type === 'MARGIN_CALL') {
+      if (common.options.futures_margin_call_callback)
+        common.options.futures_margin_call_callback(data);
+    } else {
+      common.options.log('Unexpected userFuturesData: ' + type);
+    }
+  };
+
+  /**
    * Used by web sockets depth and populates OHLC and info
    * @param {string} symbol - symbol to get candlestick info
    * @param {"1m"|"3m"|"5m"|"15m"|"30m"|"1h"|"2h"|"4h"|"6h"|"8h"|"12h"|"1d"|"3d"|"1w"|"1M"} interval - the callback function, 1m, 3m, 5m ....
@@ -1470,7 +1490,7 @@ module.exports = function (common) {
   ) {
     let reconnect = () => {
       if (common.options.reconnect)
-        userMarginData(callback, execution_callback, subscribed_callback);
+        userMarginData(callback, execution_callback, subscribed_callback, list_status_callback);
     };
     apiRequest(
       common,
@@ -1504,6 +1524,64 @@ module.exports = function (common) {
         const subscription = subscribe(
           common.options.listenMarginKey,
           userMarginDataHandler,
+          reconnect
+        );
+        if (subscribed_callback) subscribed_callback(subscription.endpoint);
+      },
+      'POST'
+    );
+  };
+
+  /**
+   * Futures Userdata websockets function
+   * @param {function} callback - the callback function
+   * @param {function} order_trade_callback - optional order trade update callback
+   * @param {function} subscribed_callback - subscription callback
+   * @param {function} margin_call_callback - margin call callback
+   * @return {undefined}
+   */
+  this.userFuturesData = function userFuturesData(
+    callback,
+    order_trade_callback = false,
+    subscribed_callback = false,
+    margin_call_callback = false
+  ) {
+    let reconnect = () => {
+      if (common.options.reconnect)
+        userFuturesData(callback, order_trade_callback, subscribed_callback, margin_call_callback);
+    };
+    apiRequest(
+      common,
+      common.fapi + 'v1/listenKey',
+      {},
+      function (error, response) {
+        common.options.listenFuturesKey = response.listenKey;
+        setTimeout(function userDataKeepAlive() {
+          // keepalive
+          try {
+            apiRequest(
+              common,
+              common.fapi +
+                'v1/listenKey?listenKey=' +
+                common.options.listenFuturesKey,
+              {},
+              function (err) {
+                if (err) setTimeout(userDataKeepAlive, 60000);
+                // retry in 1 minute
+                else setTimeout(userDataKeepAlive, 60 * 60 * 1000); // 60 minute keepalive
+              },
+              'PUT'
+            );
+          } catch (error) {
+            setTimeout(userDataKeepAlive, 60000); // retry in 1 minute
+          }
+        }, 60 * 60 * 1000); // 60 minute keepalive
+        common.options.futures_account_callback = callback;
+        common.options.futures_order_trade_callback = order_trade_callback;
+        common.options.futures_margin_call_callback = margin_call_callback;
+        const subscription = futuresSubscribe(
+          common.options.listenFuturesKey,
+          userFuturesDataHandler,
           reconnect
         );
         if (subscribed_callback) subscribed_callback(subscription.endpoint);
