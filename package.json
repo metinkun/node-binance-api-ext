@@ -1,6 +1,6 @@
 {
   "name": "node-binance-api-ext",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Extended Binance API for node with intellisense and full documentation",
   "main": "src/index.js",
   "dependencies": {
