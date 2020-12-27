@@ -319,7 +319,6 @@ module.exports = function (common) {
       5
     );
   };
-
   /**
    * Gets the depth information for a given symbol
    * @param {string} symbol - the symbol

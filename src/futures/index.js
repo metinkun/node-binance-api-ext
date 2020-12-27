@@ -46,7 +46,7 @@ module.exports = function (common) {
         params.type === 'STOP' ||
         params.type === 'TAKE_PROFIT')
     ) {
-      params.timeInForce = 'GTX'; // Post only by default. Use GTC for limit orders.
+      params.timeInForce = 'GTC'; // Post only by default. Use GTC for limit orders.
     }
     return promiseRequest(
       common,
