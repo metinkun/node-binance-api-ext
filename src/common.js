@@ -85,6 +85,10 @@ function setOptions(opt = {}, common, callback = false) {
   }
   if (common.options.useServerTime) {
     apiRequest(common, common.base + 'v3/time', {}, function (error, response) {
+      if (error) {
+        if (callback) callback(error);
+        return
+      }
       common.info.timeOffset = response.serverTime - new Date().getTime();
       //common.options.log("server time set: ", response.serverTime, common.info.timeOffset);
       if (callback) callback();
