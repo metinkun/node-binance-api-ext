@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "dependencies": {
     "async": "^3.1.0",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "https-proxy-agent": "^3.0.1",
     "qs": "^6.9.4",
     "rate-limit-ext": "^2.0.4",
